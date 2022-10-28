@@ -158,6 +158,10 @@ for i in range(-N_pre, N+N_post):
         print("\t||v||: %.3f\t ||dv||: %.3f"%(norm(v, 2), norm(dv)))
 
     q, v = tsid_bip.integrate_dv(q, v, dv, conf.dt)
+    # strenght = 9e-5
+    # q = q + np.concatenate([np.random.rand(3)*strenght, np.zeros(4), np.random.rand(len(q)-7)*strenght])
+    # v = v + np.concatenate([np.random.rand(3)*strenght, np.zeros(3), np.random.rand(len(v)-6)*strenght])
+
     t += conf.dt
 
     if conf.PUSH and i==int(N/2):
@@ -197,7 +201,9 @@ if PLOT_COM:
         ax[i].set_ylabel('CoM [m]')
         leg = ax[i].legend()
         leg.get_frame().set_alpha(0.5)
-    
+        # plt.xlim([2.9, 3.5])
+        # plt.ylim([0.635, 0.66])
+
     (f, ax) = create_empty_figure(3,1)
     for i in range(3):
         ax[i].plot(time, com_vel[i,:], label='CoM Vel '+str(i))
@@ -265,8 +271,9 @@ if PLOT_TORQUES:
     for i in range(tsid_bip.robot.na):
         tau_normalized = 2*(tau[i,:]-tsid_bip.tau_min[i]) / (tsid_bip.tau_max[i]-tsid_bip.tau_min[i]) - 1
         # plot torques only for joints that reached 50% of max torque
-        if np.max(np.abs(tau_normalized))>0.5:
-            plt.plot(time, tau_normalized, alpha=0.5, label=tsid_bip.model.names[i+2])
+        #TODO RESET
+        #if np.max(np.abs(tau_normalized))>0.5:
+        plt.plot(time, tau_normalized, alpha=0.5, label=tsid_bip.model.names[i+2])
     plt.plot([time[0], time[-1]], 2*[-1.0], ':')
     plt.plot([time[0], time[-1]], 2*[1.0], ':')
     plt.gca().set_xlabel('Time [s]')
