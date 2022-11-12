@@ -154,24 +154,35 @@ class RobotSimulator:
         # for gepetto viewer
         self.gui = None
         if(conf.use_viewer):
-            try:
-                prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
-                if int(prompt[1]) == 0:
-                    os.system('gepetto-gui &')
-                time.sleep(1)
-            except:
-                pass
-            gepetto.corbaserver.Client()
-            self.robot.initViewer(loadModel=False)
-            self.gui = self.robot.viewer.gui
-            if(conf.show_floor):
-                self.robot.viewer.gui.createSceneWithFloor('world')
-                self.gui.setLightingMode('world/floor', 'OFF')
-    
-            self.robot.loadViewerModel()
-            self.robot.displayCollisions(False)
-            self.robot.displayVisuals(True)
-            self.robot.display(self.q)            
+            if (conf.which_viewer == "meshcat"):
+                # Import meshcat visualizer and load the robot in its default configuration
+                import pinocchio as pin
+                import webbrowser
+                self.viz = pin.visualize.MeshcatVisualizer(robot.model, robot.collision_model,robot.visual_model)
+                self.viz.initViewer()
+                webbrowser.open(self.viz.viewer.url())
+                self.viz.loadViewerModel()
+                self.viz.display(robot.q0)
+                time.sleep(3)
+            else:
+                try:
+                    prompt = subprocess.getstatusoutput("ps aux |grep 'gepetto-gui'|grep -v 'grep'|wc -l")
+                    if int(prompt[1]) == 0:
+                        os.system('gepetto-gui &')
+                    time.sleep(1)
+                except:
+                    pass
+                gepetto.corbaserver.Client()
+                self.robot.initViewer(loadModel=False)
+                self.gui = self.robot.viewer.gui
+                if(conf.show_floor):
+                    self.robot.viewer.gui.createSceneWithFloor('world')
+                    self.gui.setLightingMode('world/floor', 'OFF')
+        
+                self.robot.loadViewerModel()
+                self.robot.displayCollisions(False)
+                self.robot.displayVisuals(True)
+                self.robot.display(self.q)            
             
 #            LOCOSIM_PATH = "/home/adelprete/devel/src/locosim"
 #            success = self.gui.addMesh("world/pinocchio/tavolo", LOCOSIM_PATH+"/ros_impedance_controller/worlds/models/tavolo/mesh/tavolo.stl")
@@ -356,21 +367,27 @@ class RobotSimulator:
 
         if(self.conf.use_viewer):
             self.display_counter -= dt
-            if self.display_counter <= 0.0:
-                self.robot.display(self.q)
-                self.display_counter = self.DISPLAY_T
+            if self.conf.which_viewer == "meshcat":
+                self.display(self.q)
+            else:
+                if self.display_counter <= 0.0:
+                    self.robot.display(self.q)
+                    self.display_counter = self.DISPLAY_T
 
         return self.q, self.v, self.f
         
     def display(self, q):
         if(self.conf.use_viewer):
-            for frame in self.frame_axes:
-                frame_id = self.robot.model.getFrameId(frame)
-                H = self.robot.framePlacement(q, frame_id)
-                self.robot.applyConfiguration("world/axes-"+frame, se3.SE3ToXYZQUATtuple(H))
-#                self.gui.applyConfiguration("world/axes-"+frame, se3.SE3ToXYZQUATtuple(H))
+            if self.conf.which_viewer == "meshcat":
+                self.viz.display(q)
+            else: 
+                for frame in self.frame_axes:
+                    frame_id = self.robot.model.getFrameId(frame)
+                    H = self.robot.framePlacement(q, frame_id)
+                    self.robot.applyConfiguration("world/axes-"+frame, se3.SE3ToXYZQUATtuple(H))
+    #                self.gui.applyConfiguration("world/axes-"+frame, se3.SE3ToXYZQUATtuple(H))
                 
-            self.robot.display(q)
+                self.robot.display(q)
             
     def display_motion(self, Q, dt, slow_down_factor=1):
         for i in range(Q.shape[0]):

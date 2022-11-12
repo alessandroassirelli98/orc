@@ -14,6 +14,7 @@ import numpy as np
 from numpy import nan
 from numpy.linalg import norm as norm
 import matplotlib.pyplot as plt
+plt.style.use("seaborn")
 
 print("".center(conf.LINE_WIDTH,'#'))
 print(" Test Walking ".center(conf.LINE_WIDTH, '#'))
@@ -21,7 +22,7 @@ print("".center(conf.LINE_WIDTH,'#'), '\n')
 
 PLOT_COM = 1
 PLOT_COP = 1
-PLOT_FOOT_TRAJ = 0
+PLOT_FOOT_TRAJ = 1
 PLOT_TORQUES = 1
 PLOT_JOINT_VEL = 0
 
@@ -158,9 +159,7 @@ for i in range(-N_pre, N+N_post):
         print("\t||v||: %.3f\t ||dv||: %.3f"%(norm(v, 2), norm(dv)))
 
     q, v = tsid_bip.integrate_dv(q, v, dv, conf.dt)
-    # strenght = 9e-5
-    # q = q + np.concatenate([np.random.rand(3)*strenght, np.zeros(4), np.random.rand(len(q)-7)*strenght])
-    # v = v + np.concatenate([np.random.rand(3)*strenght, np.zeros(3), np.random.rand(len(v)-6)*strenght])
+
 
     t += conf.dt
 
@@ -202,12 +201,13 @@ if PLOT_COM:
         leg = ax[i].legend()
         leg.get_frame().set_alpha(0.5)
         # plt.xlim([2.9, 3.5])
-        # plt.ylim([0.635, 0.66])
+        # plt.ylim([0.635, 0.68])
 
     (f, ax) = create_empty_figure(3,1)
     for i in range(3):
         ax[i].plot(time, com_vel[i,:], label='CoM Vel '+str(i))
         ax[i].plot(time[:N], com_vel_ref[i,:], 'r:', label='CoM Vel Ref '+str(i))
+        
         ax[i].set_xlabel('Time [s]')
         ax[i].set_ylabel('CoM Vel [m/s]')
         leg = ax[i].legend()
@@ -240,8 +240,9 @@ if PLOT_COP:
         leg.get_frame().set_alpha(0.5)
     
 if PLOT_FOOT_TRAJ:
+    (f, ax) = create_empty_figure(2,1)
     for i in range(3):
-        plt.figure()
+        plt.subplot(3,1, i+1)
         plt.plot(time, x_RF[i,:], label='x RF '+str(i))
         plt.plot(time[:N], x_RF_ref[i,:], ':', label='x RF ref '+str(i))
         plt.plot(time, x_LF[i,:], label='x LF '+str(i))
@@ -271,9 +272,8 @@ if PLOT_TORQUES:
     for i in range(tsid_bip.robot.na):
         tau_normalized = 2*(tau[i,:]-tsid_bip.tau_min[i]) / (tsid_bip.tau_max[i]-tsid_bip.tau_min[i]) - 1
         # plot torques only for joints that reached 50% of max torque
-        #TODO RESET
-        #if np.max(np.abs(tau_normalized))>0.5:
-        plt.plot(time, tau_normalized, alpha=0.5, label=tsid_bip.model.names[i+2])
+        if np.max(np.abs(tau_normalized))>0.5:
+            plt.plot(time, tau_normalized, alpha=0.5, label=tsid_bip.model.names[i+2])
     plt.plot([time[0], time[-1]], 2*[-1.0], ':')
     plt.plot([time[0], time[-1]], 2*[1.0], ':')
     plt.gca().set_xlabel('Time [s]')

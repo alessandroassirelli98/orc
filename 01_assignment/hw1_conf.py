@@ -17,7 +17,7 @@ DATA_FILE_LIPM = 'talos_walking_traj_lipm.npz'
 DATA_FILE_TSID = 'talos_walking_traj_tsid.npz'
 
 PUSH = 0                                               # Flag to activate CoM push @ half walk
-push_robot_com_vel = [0.43,0.,0.]                       # CoM velocity push
+push_robot_com_vel = [0,0, -0.5] #[0.43,0.,0.]                       # CoM velocity push
 SQUAT = 0                                              # Flag to activate squat task
 squat_height = 0.65                                    # desired CoM height while squatting 
 
@@ -63,7 +63,7 @@ dt = 0.002                      # controller time step
 T_pre  = 1.5                    # simulation time before starting to walk
 T_post = 0                      # simulation time after walking
 
-w_com = 3e1                    # weight of center of mass task (ref trajectory)
+w_com = 3e0                    # weight of center of mass task (ref trajectory)
 if SQUAT:
     w_squat = 10                # weight of squat task
 else:

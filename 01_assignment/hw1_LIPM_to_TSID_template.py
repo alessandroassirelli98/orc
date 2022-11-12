@@ -18,6 +18,12 @@ def compute_3rd_order_poly_traj(x0, x1, T, dt):
     dx = np.zeros((len(x0), N_step))
     ddx = np.zeros((len(x0), N_step))
 
+    #Calculating coefficients with the following constraints
+    # x(0) = x0
+    # x(T) = x1
+    # x'(0) = 0
+    # x'(T) = 0
+
     a = x0
     b = 0
     c = - 3* (x0 - x1)/(T**2)

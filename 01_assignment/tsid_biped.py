@@ -179,7 +179,6 @@ class TsidBiped:
                 self.viz = viewer(self.robot_display.model, self.robot_display.collision_model,
                                   self.robot_display.visual_model)
                 self.viz.initViewer(loadModel=True)
-                # TODO REMOVE BEFORE DELIVERY
                 import webbrowser
                 webbrowser.open(self.viz.viewer.url())
                 self.viz.display(q)

@@ -11,7 +11,7 @@ LINE_WIDTH = 60
 
 T = 2.0                         # OCP horizon
 dt = 0.02                     # OCP time step
-integration_scheme = 'RK-1'
+integration_scheme = 'RK-4'
 use_finite_diff = 0
 max_iter = 100
 
@@ -119,3 +119,4 @@ show_floor = False
 DISPLAY_T = 0.02              # update robot configuration in viwewer every DISPLAY_T seconds
 CAMERA_TRANSFORM = [1.0568891763687134, 0.7100808024406433, 0.39807042479515076, 
                     0.2770655155181885, 0.5401807427406311, 0.6969326734542847, 0.3817386031150818]
+which_viewer = "meshcat"
