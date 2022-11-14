@@ -45,3 +45,4 @@ EE_REF_SPHERE_COLOR  = (1, 0, 0, 0.5)
 path      = '/opt/openrobots/share/'
 urdf      = path + "example-robot-data/robots/ur_description/urdf/ur5_robot.urdf";
 srdf      = path + 'example-robot-data/robots/ur_description/srdf/ur5_robot.srdf'
+which_viewer = "meshcat"

@@ -97,6 +97,8 @@ class DDPSolver:
                 (X,U) = self.simulate_system(x0, U_bar + alpha*self.w, self.K, X_bar)
                 new_cost = self.cost(X, U)
                 exp_impr = alpha*self.d1 + 0.5*(alpha**2)*self.d2
+                if exp_impr > 0:
+                    exp_impr = -1
 #                print("Expected improvement", exp_impr, "Real improvement", new_cost-cst)
                 relative_impr = (new_cost-cst)/exp_impr
                 

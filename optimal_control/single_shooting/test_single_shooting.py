@@ -85,7 +85,7 @@ if(conf.use_viewer):
     # else:
     #     simu.gui.setVisibility('world/target', 'OFF')
     
-    # add red spheres to display the volumes used for collision avoidance
+    # # add red spheres to display the volumes used for collision avoidance
     # for (frame, dist) in conf.table_collision_frames:
     #     simu.add_frame_axes(frame, radius=dist, length=0.0, color=(1.,0,0,0.2))
     # for (frame1, frame2, d) in conf.self_collision_frames:
