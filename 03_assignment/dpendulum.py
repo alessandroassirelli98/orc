@@ -10,86 +10,56 @@ class DPendulum:
         Guassian noise can be added in the dynamics. 
         Cost is -1 if the goal state has been reached, zero otherwise.
     '''
-    def __init__(self, nu=11, vMax=5, uMax=5, dt=0.2, ndt=1, noise_stddev=0):
+    def __init__(self, nu=3, vMax=8, uMax=2, dt=0.2, ndt=1, noise_stddev=0):
         self.pendulum = Pendulum(1,noise_stddev)
         self.pendulum.DT  = dt
         self.pendulum.NDT = ndt
         self.vMax = vMax    # Max velocity (v in [-vmax,vmax])
+        self.nq = 1
+        self.nv = 1
+        self.nx = self.nq + self.nv
         self.nu = nu        # Number of discretization steps for joint torque
         self.uMax = uMax    # Max torque (u in [-umax,umax])
         self.dt = dt        # time step
+        self.control_map = np.linspace(-uMax, uMax, nu)
+        self.goal = np.array([0.,0.])
 
+        self.m = 1
+        self.l = 1
+        self.g = 9.81
 
-    @property
-    def nqv(self): return [self.nq,self.nv]
-    @property
-    def nx(self): return self.nq*self.nv
-    @property
-    def goal(self): return self.x2i(self.c2d([0.,0.]))
-    
-    # Continuous to discrete
-    def c2dq(self, q):
-        q = (q+pi)%(2*pi)
-        return int(np.floor(q/self.DQ))  % self.nq
-    
-    def c2dv(self, v):
-        v = np.clip(v,-self.vMax+1e-3,self.vMax-1e-3)
-        return int(np.floor((v+self.vMax)/self.DV))
-    
-    def c2du(self, u):
-        u = np.clip(u,-self.uMax+1e-3,self.uMax-1e-3)
-        return int(np.floor((u+self.uMax)/self.DU))
-    
-    def c2d(self, qv):
-        '''From continuous to 2d discrete.'''
-        return np.array([self.c2dq(qv[0]), self.c2dv(qv[1])])
-    
-    # Discrete to continuous
-    def d2cq(self, iq):
-        iq = np.clip(iq,0,self.nq-1)
-        return iq*self.DQ - pi + 0.5*self.DQ
-    
-    def d2cv(self, iv):
-        iv = np.clip(iv,0,self.nv-1) - (self.nv-1)/2
-        return iv*self.DV
-    
-    def d2cu(self, iu):
-        iu = np.clip(iu,0,self.nu-1) - (self.nu-1)/2
-        return iu*self.DU
-    
-    def d2c(self, iqv):
-        '''From 2d discrete to continuous'''
-        return np.array([self.d2cq(iqv[0]), self.d2cv(iqv[1])])
-    
-    ''' From 2d discrete to 1d discrete '''
-    def x2i(self, x): return x[0]+x[1]*self.nq
-    
-    ''' From 1d discrete to 2d discrete '''
-    def i2x(self, i): return [ i%self.nq, int(np.floor(i/self.nq)) ]
+    def map_control(self, iu):
+        return self.control_map[iu]
 
-    def reset(self,x=None):
-        if x is None:
-            self.x = np.random.randint(0,self.nx)
-        else: 
-            self.x = x
-        return self.x
+    def reset(self,x0=None):
+        if x0 is None: 
+            q0 = np.pi*(np.random.rand(self.nq)*2-1)
+            v0 = self.vMax*(np.random.rand(self.nv)*2-1)
+            x0 = np.concatenate([q0,v0])
+        self.x = x0
+        return x0
 
-    def step(self,iu):
-        cost     = -1 if self.x==self.goal else 0
+    def step(self, iu):
+        reward = - (self.x[0]**2 + 0.1 * self.x[1]**2 + 0.001*self.control_map[iu] **2)
         self.x   = self.dynamics(self.x,iu)
-        return self.x, cost
+        done = True if (self.x == np.array([0.,0.])).all() else False
+        return self.x, reward, done
 
     def render(self):
-        q = self.d2cq(self.i2x(self.x)[0])
+        q = self.x[0]
         self.pendulum.display(np.array([q,]))
         time.sleep(self.pendulum.DT)
 
-    def dynamics(self,ix,iu):
-        x   = self.d2c(self.i2x(ix))
-        u   = self.d2cu(iu)
-        
-        self.xc,_ = self.pendulum.dynamics(x,u)
-        return self.x2i(self.c2d(self.xc))
+    def dynamics(self, x, iu):
+        m = self.m
+        l = self.l
+        g = self.g
+        dt = self.dt
+
+        thdot = x[1] + (3/(2*l) * g * np.sin(x[0]) + 3/(m*l**2)*self.control_map[iu])*dt
+        th = x[0] + thdot*dt
+        x = np.array([th, thdot])
+        return x
     
     def plot_V_table(self, V):
         ''' Plot the given Value table V '''
