@@ -59,7 +59,7 @@ class Pendulum:
 
         self.DT         = 5e-2   # Time step length
         self.NDT        = 1      # Number of Euler steps per integration (internal)
-        self.Kf         = .10    # Friction coefficient
+        self.Kf         = 0*.10    # Friction coefficient
         self.vmax       = 8.0    # Max velocity (clipped if larger)
         self.umax       = 2.0    # Max torque   (clipped if larger)
         self.withSinCos = False  # If true, state is [cos(q),sin(q),qdot], else [q,qdot]
@@ -74,7 +74,7 @@ class Pendulum:
         mass = length
         inertia = pin.Inertia(mass,
                               np.array([0.0,0.0,length/2]).T,
-                              mass/5*np.diagflat([ 1e-2,length**2,  1e-2 ]) )
+                              mass/12*np.diagflat([ 1e-5, length**2,  1e-5 ]) )
 
         for i in range(nbJoint):
             istr = str(i)
@@ -119,7 +119,7 @@ class Pendulum:
     def reset(self, x0=None):
         ''' Reset the state of the environment to x0 '''
         if x0 is None: 
-            q0 = np.pi*(np.rand(self.nq)*2-1)
+            q0 = np.pi*(np.random.rand(self.nq)*2-1)
             v0 = np.rand(self.nv)*2-1
             x0 = np.vstack([q0,v0])
         assert len(x0)==self.nx
