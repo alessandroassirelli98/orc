@@ -57,6 +57,17 @@ class ModifiedTensorBoard(TensorBoard):
                 tf.summary.scalar(key, value, step = self.step)
                 self.writer.flush()
 
+QVALUE_LEARNING_RATE = 1e-3
+DISCOUNT = 0.99
+BATCH_SIZE = 32
+MEMORY_BUFFER_LENGTH = 10_000
+MIN_BUFFER_TO_TRAIN = 1000
+EXPLORATION_PROBABILITY_DECAY = 0.0001
+MIN_EXPLORATION_PROBABILITY = 0.1
+TARGET_NETWORK_UPDATE_FREQUENCY = 10
+
+MODEL_NAME = "DQN0"
+
 class DQNAgent():
     
     def __init__(self):
@@ -69,9 +80,12 @@ class DQNAgent():
 
         self.critic_optimizer = tf.keras.optimizers.Adam(QVALUE_LEARNING_RATE)
         self.loss_fcn = tf.keras.losses.MeanSquaredError()
+        self.loss_value = 0
 
         # An array with last n steps for training
         self.replay_memory = []
+
+        self.exploration_probability = 1
 
         # Custom tensorboard object
         self.tensorboard = ModifiedTensorBoard(log_dir="logs/{}-{}".format(MODEL_NAME, int(time.time())))
@@ -110,9 +124,21 @@ class DQNAgent():
 
     # Queries main network for Q values given current observation space (environment state)
     def get_qs(self, state):
-        return self.model.predict(np.array(state).reshape(1,-1))[0]
+        return self.model(np.array(state).reshape(1,-1))[0]
 
+    def update_probability(self, step):
+        if self.exploration_probability > MIN_EXPLORATION_PROBABILITY:
+            self.exploration_probability = np.exp(-EXPLORATION_PROBABILITY_DECAY * step)
     
+    def compute_action(self):
+        if np.random.uniform() < self.exploration_probability:
+            # take random action
+            idx_u = np.array([np.random.randint(0, ndu)])
+        else:
+            idx_u = np.array([np.argmax(agent.get_qs(current_state))])
+        
+        return idx_u
+
     def train(self, terminal_state):
 
         # Start training only if certain number of samples is already saved
@@ -122,10 +148,10 @@ class DQNAgent():
         minibatch = random.sample(self.replay_memory, BATCH_SIZE)
         # Get current states from minibatch, then query NN model for Q values
         current_states = np.array([transition['current_state'] for transition in minibatch])
-        current_qs_list = self.model.predict(current_states)
+        current_qs_list = tf2np(self.model(current_states))
 
         next_states = np.array([transition['next_state'] for transition in minibatch])
-        future_qs_list = self.target_model.predict(next_states)
+        future_qs_list = tf2np(self.target_model(next_states))
 
         X = []
         Y = []
@@ -154,6 +180,7 @@ class DQNAgent():
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0
 
+
     
     def update(self, x, y):
         ''' Update the weights of the Q network using the specified batch of data '''
@@ -163,19 +190,18 @@ class DQNAgent():
             # Trainable variables (created by tf.Variable or tf.compat.v1.get_variable, where trainable=True is default in both cases) are automatically watched. 
             # Tensors can be manually watched by invoking the watch method on this context manager.
             logits = self.model(x, training=True)
-            loss_value = self.loss_fcn(y, logits)
+            self.loss_value = self.loss_fcn(y, logits)
         # Compute the gradients of the critic loss w.r.t. critic's parameters (weights and biases)
-        Q_grad = tape.gradient(loss_value, self.model.trainable_variables)          
+        Q_grad = tape.gradient(self.loss_value, self.model.trainable_variables)          
         # Update the critic backpropagating the gradients
-        self.critic_optimizer.apply_gradients(zip(Q_grad, self.model.trainable_variables))   
+        self.critic_optimizer.apply_gradients(zip(Q_grad, self.model.trainable_variables))
+
 
 def xy_to_t(state):
     return np.array([np.arctan2(state[1], state[0]), state[2]])
 
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
-
-     
 
 
 env = gym.make('Pendulum')
@@ -186,28 +212,18 @@ ndu = 3
 Q_episodes_history = []
 Q_max_history = []
 
-MODEL_NAME = "DQN0"
+
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-
-QVALUE_LEARNING_RATE = 1e-3
-DISCOUNT = 0.99
-BATCH_SIZE = 32
-MAX_NUMBER_OF_EPISODES = 20
+MAX_NUMBER_OF_EPISODES = 1000
 MAX_EPISODE_LENGTH = 201
-MEMORY_BUFFER_LENGTH = 50_000
-# STEP_BEFORE_TRAIN = 4
-TARGET_NETWORK_UPDATE_FREQUENCY = 10
-MIN_BUFFER_TO_TRAIN = 1000
-EXPLORATION_PROBABILITY_DECAY = 0.01
-MIN_EXPLORATION_PROBABILITY = 0.1
 
-exploration_prob = 1
 ep_rewards = []
 
 control_map = np.linspace(-umax, umax, ndu)
 
 agent = DQNAgent()
+step = 1
 for episode in range (1, MAX_NUMBER_OF_EPISODES):
     agent.tensorboard.step = episode
 
@@ -216,25 +232,20 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     done = False
     for iter in range(MAX_EPISODE_LENGTH):
         print("Episode ", episode, "step: ", iter)
-        if np.random.uniform() < exploration_prob:
-            # take random action
-            idx_u = np.array([np.random.randint(0, ndu)])
-            u = control_map[idx_u]
-        else:
-            idx_u = np.array([np.argmax(agent.get_qs(current_state))])
-            u = control_map[idx_u]
 
-        next_state, reward, done, _ = env.step(u)
+        idx_u = agent.compute_action()
+        next_state, reward, done, _ = env.step(control_map[idx_u])
+
         episode_reward += reward
         next_state = xy_to_t(next_state)
 
         agent.store_episode(current_state, idx_u, reward, next_state, done)
+        agent.update_probability(step)
         agent.train(done)
-
-        if done:
-            break
-
+        
         current_state = next_state
+        step += 1
+    
 
     # Append episode reward to a list and log stats (every given number of episodes)
     ep_rewards.append(episode_reward)
@@ -242,118 +253,9 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         average_reward = (sum(ep_rewards[-AGGREGATE_STATS_EVERY:])/len(ep_rewards[-AGGREGATE_STATS_EVERY:]))
         min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
         max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=exploration_prob)
+        agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=agent.exploration_probability, loss=agent.loss_value)
         # Save model, but only when min reward is greater or equal a set value
         # if min_reward >= MIN_REWARD:
         #     agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
-    
-    # Decay epsilon
-    if exploration_prob > MIN_EXPLORATION_PROBABILITY:
-        exploration_prob = np.exp(-EXPLORATION_PROBABILITY_DECAY * episode)
-        exploration_prob = max(exploration_prob, MIN_EXPLORATION_PROBABILITY)
 
 
-
-
-
-# current_state=xy_to_t(env.reset())
-# for step in range(MAX_EPISODE_LENGTH):
-#     action = np.array([control_map[np.argmax(agent.get_qs(current_state))]])
-#     next_state, r, done, _ = env.step(action)
-#     current_state = xy_to_t(next_state)
-#     env.render()
-#     # time.sleep(0.01)
-
-
-
-
-
-
-
-
-
-
-
-# --------------------------------------------------------------- #
-# Create critic and target NNs
-# Q.summary()
-
-# Set initial weights of targets equal to those of the critic
-# Q_target.set_weights(Q.get_weights())
-
-# Set optimizer specifying the learning rates
-# critic_optimizer = tf.keras.optimizers.Adam(QVALUE_LEARNING_RATE)
-
-# step = 0
-# for episode in range (MAX_NUMBER_OF_EPISODES):
-#     print("------ Episode ", episode, "over ", MAX_NUMBER_OF_EPISODES, " ------")
-#     current_state = xy_to_t(env.reset())
-#     for k in range(MAX_EPISODE_LENGTH):
-#         print("Episode ", episode, "step: ", k)
-#         if np.random.uniform() < exploration_prob :
-#                 # take random action
-#                 u = np.array([np.random.choice(control_map)])
-#         else:
-#             u = np.array([control_map[np.argmax(Q.predict(current_state.reshape(1,-1)))]])
-        
-#         next_state, reward, done, _ = env.step(u)
-#         next_state = xy_to_t(next_state)
-#         store_episode(memory_buffer, current_state, u, reward, next_state, done)
-#         current_state = next_state
-#         step += 1
-
-#         if (step > MIN_BUFFER_TO_TRAIN):
-
-#             np.random.shuffle(memory_buffer)
-#             batch_sample = memory_buffer[: BATCH_SIZE]
-#             xu_batch = [x["current_state"] for x in batch_sample]
-#             reward_batch = [x["reward"] for x in batch_sample]
-#             xu_next_batch = [x["next_state"] for x in batch_sample]
-#             action_batch = [x["action"] for x in batch_sample]
-
-#             if (step % TARGET_NETWORK_UPDATE_FREQUENCY == 0):
-#                 Q_target.set_weights(Q.get_weights())
-
-#             for xu, reward, action, xu_next in zip(xu_batch, reward_batch, action_batch, xu_next_batch):
-#                 update(xu, reward, action, xu_next)
-
-#         exploration_prob = np.exp(-EXPLORATION_PROBABILITY_DECAY * step)
-#         exploration_prob = max(exploration_prob, MIN_EXPLORATION_PROBABILITY)
-#         Q_max_history.append(np.max(Q.predict(current_state.reshape(1,-1))))
-#     Q_episodes_history.append(Q_max_history)
-
-
-# w = Q.get_weights()
-# for i in range(len(w)):
-#     print("Shape Q weights layer", i, w[i].shape)
-    
-# for i in range(len(w)):
-#     print("Norm Q weights layer", i, np.linalg.norm(w[i]))
-    
-# print("\nDouble the weights")
-# for i in range(len(w)):
-#     w[i] *= 2
-# Q.set_weights(w)
-
-# w = Q.get_weights()
-# for i in range(len(w)):
-#     print("Norm Q weights layer", i, np.linalg.norm(w[i]))
-
-# print("\nSave NN weights to file (in HDF5)")
-# Q.save_weights("namefile.h5")
-
-# print("Load NN weights from file\n")
-# Q_target.load_weights("namefile.h5")
-
-# w = Q_target.get_weights()
-# for i in range(len(w)):
-#     print("Norm Q weights layer", i, np.linalg.norm(w[i]))
-
-
-# current_state=xy_to_t(env.reset()).reshape(1,-1)
-# for step in range(MAX_EPISODE_LENGTH):
-#     action = np.array([control_map[np.argmax(Q.predict(current_state))]])
-#     next_state, r, done, _ = env.step(action)
-#     current_state = xy_to_t(next_state).reshape(1,-1)
-#     env.render()
-#     sleep(0.01)
