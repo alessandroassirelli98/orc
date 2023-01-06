@@ -64,11 +64,11 @@ DISCOUNT = 0.99
 BATCH_SIZE = 32
 MEMORY_BUFFER_LENGTH = 10_000
 MIN_BUFFER_TO_TRAIN = 1000
-EXPLORATION_PROBABILITY_DECAY = 0.0001
+EXPLORATION_PROBABILITY_DECAY = 0.00001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
-MODEL_NAME = "DQN0_"
+MODEL_NAME = "DQN0_buff_10000_joint_locked_9out"
 
 class DQNAgent():
     
@@ -98,7 +98,7 @@ class DQNAgent():
     
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
-        inputs = layers.Input(shape=(2,))
+        inputs = layers.Input(shape=(nx,))
         state_out1 = layers.Dense(16, activation="relu")(inputs) 
         state_out2 = layers.Dense(32, activation="relu")(state_out1) 
         state_out3 = layers.Dense(64, activation="relu")(state_out2) 
@@ -205,15 +205,15 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 2
-ndu = 3
-env = DPendulum(ndu=3, uMax=uMax, dt=0.05)
+uMax = 3
+ndu = 9
+env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax2 = 30, dt=0.01)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 300
+MAX_NUMBER_OF_EPISODES = 1000
 
 ep_costs = []
 average_record = [-1e4]
@@ -222,7 +222,7 @@ agent = DQNAgent()
 step = 1
 for episode in range (1, MAX_NUMBER_OF_EPISODES):
     agent.tensorboard.step = episode
-    print("Episode ", episode)
+    print("Episode ", episode )
 
     episode_cost = 0
     current_state = env.reset()
@@ -250,7 +250,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         agent.tensorboard.update_stats(cost_avg=average_cost, cost_min=min_cost, cost_max=max_cost, epsilon=agent.exploration_probability, loss=agent.loss_value)
         
         if average_cost < min(average_record):
-            agent.model.save_weights(MODEL_NAME + "dpendulum_best.h5")
+            agent.model.save_weights("ddouble_pendulum_best.h5")
 
         average_record.append(average_cost)
 
