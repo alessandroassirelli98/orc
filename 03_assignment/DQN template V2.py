@@ -68,16 +68,16 @@ EXPLORATION_PROBABILITY_DECAY = 0.0001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
-MODEL_NAME = "DQN0_"
-
 class DQNAgent():
     
-    def __init__(self):
+    def __init__(self, load_file = None):
         # Main model
         self.model = self.get_critic()
 
         # Target network
         self.target_model = self.get_critic()
+        if load_file:
+            self.model.load_weights(load_file)
         self.target_model.set_weights(self.model.get_weights())
 
         self.critic_optimizer = tf.keras.optimizers.Adam(QVALUE_LEARNING_RATE)
@@ -99,9 +99,9 @@ class DQNAgent():
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
-        state_out1 = layers.Dense(16, activation="relu")(inputs) 
-        state_out2 = layers.Dense(32, activation="relu")(state_out1) 
-        state_out3 = layers.Dense(64, activation="relu")(state_out2) 
+        # state_out1 = layers.Dense(16, activation="relu")(inputs) 
+        # state_out2 = layers.Dense(32, activation="relu")(state_out1) 
+        state_out3 = layers.Dense(64, activation="relu")(inputs) 
         state_out4 = layers.Dense(64, activation="relu")(state_out3)
         outputs = layers.Dense(ndu)(state_out4) 
 
@@ -205,18 +205,20 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 2
+uMax = 3
 ndu = 3
-env = DPendulum(ndu=3, uMax=uMax, dt=0.05)
+env = DPendulum(ndu=ndu, uMax=uMax, dt=0.05)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 300
+MAX_NUMBER_OF_EPISODES = 500
+STEP_BEFORE_TRAIN = 4
 
 ep_costs = []
-average_record = [-1e4]
+average_record = [1e6]
+MODEL_NAME = "Pendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
@@ -227,6 +229,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     episode_cost = 0
     current_state = env.reset()
     done = False
+    jj = 0
     while not done:
         iu = agent.compute_action()
         next_state, cost, done = env.step(iu)
@@ -235,10 +238,12 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         agent.store_episode(current_state, iu, cost, next_state, done)
         agent.update_probability(step)
-        agent.train(done)
+        if not jj % STEP_BEFORE_TRAIN or done:
+            agent.train(done)
         
         current_state = next_state
         step += 1
+        jj += 1
     
 
     # Append episode cost to a list and log stats (every given number of episodes)
@@ -250,7 +255,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         agent.tensorboard.update_stats(cost_avg=average_cost, cost_min=min_cost, cost_max=max_cost, epsilon=agent.exploration_probability, loss=agent.loss_value)
         
         if average_cost < min(average_record):
-            agent.model.save_weights(MODEL_NAME + "dpendulum_best.h5")
+            agent.model.save_weights(MODEL_NAME + "pendulum_best.h5")
 
         average_record.append(average_cost)
 

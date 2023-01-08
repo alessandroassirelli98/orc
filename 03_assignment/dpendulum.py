@@ -46,7 +46,7 @@ class DPendulum:
         u = self.map_control(iu[0])
 
         x = self.x.copy()
-        cost = (x[0]**2 + 0.1 * x[1]**2 + 0.001*u **2)
+        cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.01*u **2)
         # cost = 1 if (self.x[0] != np.array([0.])) else 0
 
         self.x   = self.dynamics(x, u)
