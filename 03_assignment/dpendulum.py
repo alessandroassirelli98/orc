@@ -25,6 +25,9 @@ class DPendulum:
 
         self.control_map = np.linspace(-uMax, uMax, ndu)
         self.goal = np.array([0.,0.])
+        
+        max_state = np.array([np.pi, vMax])
+        self.max_cost = self.compute_cost(max_state, uMax)
 
         self.max_episodes = 200
         self.episode_counter = 0
@@ -46,9 +49,9 @@ class DPendulum:
         u = self.map_control(iu[0])
 
         x = self.x.copy()
-        cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.01*u **2)
-        # cost = 1 if (self.x[0] != np.array([0.])) else 0
 
+        cost = self.compute_cost(x, u) / self.max_cost
+        
         self.x   = self.dynamics(x, u)
         self.episode_counter += 1
 
@@ -57,6 +60,13 @@ class DPendulum:
             done = True
         
         return self.x, cost, done
+    
+    def compute_cost(self, x, u):
+        cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.001*u **2)
+        # cost = 1 if (self.x != np.array([0., 0.])).all() else 0
+        # cost = (10*x[0]**2 + 0.1 * x[1]**2)
+
+        return cost
 
     def render(self):
         q = self.x[0]

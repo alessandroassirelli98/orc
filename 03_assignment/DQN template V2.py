@@ -213,12 +213,16 @@ nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 500
+MAX_NUMBER_OF_EPISODES = 1000
 STEP_BEFORE_TRAIN = 4
 
 ep_costs = []
-average_record = [1e6]
-MODEL_NAME = "Pendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+ep_accuracy = []
+
+average_accuracy_history = [0]
+average_cost_history = [1e6]
+
+MODEL_NAME = "costscaled_Pendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
@@ -240,6 +244,8 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         agent.update_probability(step)
         if not jj % STEP_BEFORE_TRAIN or done:
             agent.train(done)
+
+        if done: ep_accuracy.append((1-cost)*100)
         
         current_state = next_state
         step += 1
@@ -250,20 +256,30 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
+        average_accuracy = (sum(ep_accuracy[-AGGREGATE_STATS_EVERY:])/len(ep_accuracy[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(cost_avg=average_cost, cost_min=min_cost, cost_max=max_cost, epsilon=agent.exploration_probability, loss=agent.loss_value)
-        
-        if average_cost < min(average_record):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best.h5")
+        agent.tensorboard.update_stats(cost_avg=average_cost, 
+                                        accuracy_avg=average_accuracy,
+                                        cost_min=min_cost, 
+                                        cost_max=max_cost, 
+                                        epsilon=agent.exploration_probability, 
+                                        loss=agent.loss_value)
 
-        average_record.append(average_cost)
+        if average_accuracy > max(average_accuracy_history):
+            agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
+        if average_cost > min(average_cost_history):
+            agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
 
+        average_accuracy_history.append(average_accuracy)
+        average_cost_history.append(average_cost)
+
+# agent.model.load_weights("Pendulum_d64_d64_ndu3uMax3_pendulum_best.h5")
 
 current_state = env.reset().reshape(1,-1)
 done = False
 while not done:
-    action = np.array([np.argmin(agent.model.predict(current_state))])
+    action = np.array([np.argmin(agent.model(current_state))])
     next_state, r, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()
