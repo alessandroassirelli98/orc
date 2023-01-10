@@ -62,13 +62,11 @@ class ModifiedTensorBoard(TensorBoard):
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 32
-MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 1000
+MEMORY_BUFFER_LENGTH = 100_000
+MIN_BUFFER_TO_TRAIN = 10000
 EXPLORATION_PROBABILITY_DECAY = 0.00001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
-
-MODEL_NAME = "DQN0_buff_10000_joint_locked_9out"
 
 class DQNAgent():
     
@@ -102,8 +100,10 @@ class DQNAgent():
         state_out1 = layers.Dense(16, activation="relu")(inputs) 
         state_out2 = layers.Dense(32, activation="relu")(state_out1) 
         state_out3 = layers.Dense(64, activation="relu")(state_out2) 
-        state_out4 = layers.Dense(64, activation="relu")(state_out3)
-        outputs = layers.Dense(ndu)(state_out4) 
+        state_out4 = layers.Dense(64, activation="relu")(state_out3) 
+        state_out5 = layers.Dense(32, activation="relu")(state_out4)
+        state_out6 = layers.Dense(16, activation="relu")(state_out5)
+        outputs = layers.Dense(ndu)(state_out6) 
 
         model = tf.keras.Model(inputs, outputs)
         # model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
@@ -205,18 +205,24 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 3
-ndu = 9
-env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax2 = 30, dt=0.01)
+uMax = 2
+ndu = 21
+env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax2 = 50, dt=0.02)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 1000
+MAX_NUMBER_OF_EPISODES = 3000
+STEP_BEFORE_TRAIN = 4
+
+MODEL_NAME = "DoubleP_d16_d32_d64_d64_d32_d16_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY)
 
 ep_costs = []
-average_record = [-1e4]
+ep_accuracy = []
+
+average_accuracy_history = [0]
+average_cost_history = [1e6]
 
 agent = DQNAgent()
 step = 1
@@ -227,6 +233,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     episode_cost = 0
     current_state = env.reset()
     done = False
+    jj = 0
     while not done:
         iu = agent.compute_action()
         next_state, cost, done = env.step(iu)
@@ -235,30 +242,45 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         agent.store_episode(current_state, iu, cost, next_state, done)
         agent.update_probability(step)
-        agent.train(done)
+
+        if not jj % STEP_BEFORE_TRAIN or done:
+            agent.train(done)
+
+        if done:
+            ep_accuracy.append((1-cost)*100)
         
         current_state = next_state
         step += 1
+        jj += 1
     
 
     # Append episode cost to a list and log stats (every given number of episodes)
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
+        average_accuracy = (sum(ep_accuracy[-AGGREGATE_STATS_EVERY:])/len(ep_accuracy[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(cost_avg=average_cost, cost_min=min_cost, cost_max=max_cost, epsilon=agent.exploration_probability, loss=agent.loss_value)
-        
-        if average_cost < min(average_record):
-            agent.model.save_weights("ddouble_pendulum_best.h5")
+        agent.tensorboard.update_stats(cost_avg=average_cost, 
+                                        accuracy_avg=average_accuracy,
+                                        cost_min=min_cost, 
+                                        cost_max=max_cost, 
+                                        epsilon=agent.exploration_probability, 
+                                        loss=agent.loss_value)
 
-        average_record.append(average_cost)
+        if average_accuracy > max(average_accuracy_history):
+            agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
+        if average_cost > min(average_cost_history):
+            agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
+
+        average_accuracy_history.append(average_accuracy)
+        average_cost_history.append(average_cost)
 
 
 current_state = env.reset().reshape(1,-1)
 done = False
 while not done:
-    action = np.array([np.argmin(agent.model.predict(current_state))])
+    action = np.array([np.argmin(agent.model(current_state))])
     next_state, r, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()

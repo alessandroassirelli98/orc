@@ -28,8 +28,11 @@ class DDoublePendulum:
 
         self.control_map = np.linspace(-uMax, uMax, ndu)
         self.goal = np.array([0.,0.])
+        
+        max_state = np.array([np.pi, np.pi, vMax1, vMax2])
+        self.max_cost = self.compute_raw_cost(max_state, [uMax])
 
-        self.max_episodes = 500
+        self.max_episodes = 200
         self.episode_counter = 0
 
         try:
@@ -49,10 +52,10 @@ class DDoublePendulum:
 
     def reset(self,x0=None):
         if x0 is None: 
-            q0 = np.array([np.random.uniform(-np.pi, np.pi), 0])
-            v0 = np.array([np.random.uniform(-1., 1.), 0])
-            # q0 = np.array([np.random.uniform(-np.pi, np.pi), np.random.uniform(-np.pi, np.pi)])
-            # v0 = np.array([np.random.uniform(-1., 1.), np.random.uniform(-1., 1.)])
+            # q0 = np.array([np.random.uniform(-np.pi, np.pi), 0])
+            # v0 = np.array([np.random.uniform(-1., 1.), 0])
+            q0 = np.array([np.random.uniform(-np.pi, np.pi), 0*np.random.uniform(-np.pi, np.pi)])
+            v0 = np.array([np.random.uniform(-1., 1.), 0*np.random.uniform(-1., 1.)])
             x0 = np.concatenate([q0,v0])
         self.x = x0
         self.episode_counter = 0
@@ -62,8 +65,8 @@ class DDoublePendulum:
         u = np.array([self.map_control([iu[0]])[0], 0]) # Underactuation
 
         x = self.x.copy()
-        reward = (x[0]**2 + 0.1 * x[2]**2 + 0.001*u[0] **2 + \
-                    x[1]**2 + 0.1 * x[3]**2)
+        
+        cost = self.compute_raw_cost(x, u) / self.max_cost
 
         self.x   = self.dynamics(x, u)
         self.episode_counter += 1
@@ -72,7 +75,12 @@ class DDoublePendulum:
         if self.episode_counter == self.max_episodes:
             done = True
         
-        return self.x, reward, done
+        return self.x, cost, done
+
+    def compute_raw_cost(self, x, u):
+        cost = (x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
+                    x[1]**2 + 0.1 * x[3]**2)
+        return cost
 
     def render(self):
         q = self.x[:self.nq]
@@ -80,6 +88,8 @@ class DDoublePendulum:
         time.sleep(self.dt)
 
     def dynamics(self, x, u):
+        modulePi = lambda th: (th+np.pi)%(2*np.pi)-np.pi
+
         dt = self.dt
         nq = self.nq
         nv = self.nv
@@ -91,11 +101,11 @@ class DDoublePendulum:
         ddq = pin.aba(model, data, q, v, u)
 
         v = v + ddq * dt
-        v = np.clip(v, -self.vMax2, self.vMax2)
-        v[1]=0
+        v = np.clip(v, [-self.vMax1, -self.vMax2], [self.vMax1, self.vMax2])
 
         q = q + v * dt
-        q[1] = 0
+        q = modulePi(q)
+
         x = np.concatenate([q, v])
         return x
     
