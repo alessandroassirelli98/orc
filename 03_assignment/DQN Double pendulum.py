@@ -61,10 +61,10 @@ class ModifiedTensorBoard(TensorBoard):
 
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 100_000
 MIN_BUFFER_TO_TRAIN = 10000
-EXPLORATION_PROBABILITY_DECAY = 0.00001
+EXPLORATION_PROBABILITY_DECAY = 0.000002
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
@@ -97,13 +97,12 @@ class DQNAgent():
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(nx,))
-        state_out1 = layers.Dense(16, activation="relu")(inputs) 
-        state_out2 = layers.Dense(32, activation="relu")(state_out1) 
+
+        state_out1 = layers.Dense(64, activation="relu")(inputs) 
+        state_out2 = layers.Dense(128, activation="relu")(state_out1)
         state_out3 = layers.Dense(64, activation="relu")(state_out2) 
-        state_out4 = layers.Dense(64, activation="relu")(state_out3) 
-        state_out5 = layers.Dense(32, activation="relu")(state_out4)
-        state_out6 = layers.Dense(16, activation="relu")(state_out5)
-        outputs = layers.Dense(ndu)(state_out6) 
+        
+        outputs = layers.Dense(ndu)(state_out3) 
 
         model = tf.keras.Model(inputs, outputs)
         # model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
@@ -206,17 +205,17 @@ def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
 uMax = 2
-ndu = 21
-env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax2 = 50, dt=0.02)
+ndu = 201
+env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax1=10, vMax2 = 25, dt=0.02)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 3000
+MAX_NUMBER_OF_EPISODES = 10000
 STEP_BEFORE_TRAIN = 4
 
-MODEL_NAME = "DoubleP_d16_d32_d64_d64_d32_d16_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY)
+MODEL_NAME = "DoubleP_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
 
 ep_costs = []
 ep_accuracy = []
@@ -270,7 +269,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         if average_accuracy > max(average_accuracy_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
-        if average_cost > min(average_cost_history):
+        if average_cost < min(average_cost_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
 
         average_accuracy_history.append(average_accuracy)

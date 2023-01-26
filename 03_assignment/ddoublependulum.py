@@ -52,10 +52,10 @@ class DDoublePendulum:
 
     def reset(self,x0=None):
         if x0 is None: 
-            # q0 = np.array([np.random.uniform(-np.pi, np.pi), 0])
-            # v0 = np.array([np.random.uniform(-1., 1.), 0])
-            q0 = np.array([np.random.uniform(-np.pi, np.pi), 0*np.random.uniform(-np.pi, np.pi)])
-            v0 = np.array([np.random.uniform(-1., 1.), 0*np.random.uniform(-1., 1.)])
+            q0 = np.array([np.pi, 0])
+            v0 = np.array([0, 0])
+            # q0 = np.array([np.random.uniform(-np.pi, np.pi), 0*np.random.uniform(-np.pi, np.pi)])
+            # v0 = np.array([np.random.uniform(-1., 1.), 0*np.random.uniform(-1., 1.)])
             x0 = np.concatenate([q0,v0])
         self.x = x0
         self.episode_counter = 0
@@ -66,7 +66,7 @@ class DDoublePendulum:
 
         x = self.x.copy()
         
-        cost = self.compute_raw_cost(x, u) / self.max_cost
+        cost = self.compute_raw_cost(x, u) #/ self.max_cost
 
         self.x   = self.dynamics(x, u)
         self.episode_counter += 1
@@ -78,8 +78,8 @@ class DDoublePendulum:
         return self.x, cost, done
 
     def compute_raw_cost(self, x, u):
-        cost = (x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
-                    x[1]**2 + 0.1 * x[3]**2)
+        cost = (10*x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
+                    10*x[1]**2 + 0.1 * x[3]**2)
         return cost
 
     def render(self):
