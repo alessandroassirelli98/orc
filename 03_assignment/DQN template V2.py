@@ -100,8 +100,8 @@ class DQNAgent():
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
         # state_out1 = layers.Dense(16, activation="relu")(inputs) 
-        # state_out2 = layers.Dense(32, activation="relu")(state_out1) 
-        state_out3 = layers.Dense(64, activation="relu")(inputs) 
+        state_out2 = layers.Dense(32, activation="relu")(inputs) 
+        state_out3 = layers.Dense(64, activation="relu")(state_out2) 
         state_out4 = layers.Dense(64, activation="relu")(state_out3)
         outputs = layers.Dense(ndu)(state_out4) 
 
@@ -206,8 +206,8 @@ def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
 uMax = 3
-ndu = 3
-env = DPendulum(ndu=ndu, uMax=uMax, dt=0.05)
+ndu = 21
+env = DPendulum(ndu=ndu, uMax=uMax, dt=0.02)
 nx = env.nx
 nu = env.nu
 
@@ -222,7 +222,7 @@ ep_accuracy = []
 average_accuracy_history = [0]
 average_cost_history = [1e6]
 
-MODEL_NAME = "costscaled_Pendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+MODEL_NAME = "Pendulum_d32_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
@@ -268,7 +268,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         if average_accuracy > max(average_accuracy_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
-        if average_cost > min(average_cost_history):
+        if average_cost < min(average_cost_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
 
         average_accuracy_history.append(average_accuracy)

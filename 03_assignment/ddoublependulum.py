@@ -65,21 +65,22 @@ class DDoublePendulum:
         u = np.array([self.map_control([iu[0]])[0], 0]) # Underactuation
 
         x = self.x.copy()
-        
-        cost = self.compute_raw_cost(x, u) #/ self.max_cost
 
         self.x   = self.dynamics(x, u)
         self.episode_counter += 1
 
-        done = True if (self.x == np.array([0.,0., 0., 0.])).all() else False
+        done = False
         if self.episode_counter == self.max_episodes:
             done = True
+
+        cost = self.compute_raw_cost(x, u) #/ self.max_cost
         
         return self.x, cost, done
 
-    def compute_raw_cost(self, x, u):
+    def compute_raw_cost(self, x, u, terminal=False):
         cost = (10*x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
-                    10*x[1]**2 + 0.1 * x[3]**2)
+                    10*x[1]**2 + 0.1 * x[3]**2) * self.dt
+
         return cost
 
     def render(self):

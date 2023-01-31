@@ -38,8 +38,8 @@ class DPendulum:
 
     def reset(self,x0=None):
         if x0 is None: 
-            q0 = np.random.uniform(-np.pi, np.pi)
-            v0 = np.random.uniform(-1., 1.)
+            q0 = np.pi
+            v0 = 0
             x0 = np.array([q0,v0])
         self.x = x0
         self.episode_counter = 0
@@ -63,9 +63,6 @@ class DPendulum:
     
     def compute_cost(self, x, u):
         cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.001*u **2)
-        # cost = 1 if (self.x != np.array([0., 0.])).all() else 0
-        # cost = (10*x[0]**2 + 0.1 * x[1]**2)
-
         return cost
 
     def render(self):
