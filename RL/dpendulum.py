@@ -79,7 +79,11 @@ class DPendulum:
         return self.x
 
     def step(self,iu):
-        cost     = -1 if self.x==self.goal else 0
+        # cost     = -1 if self.x==self.goal else 0
+        x = self.i2x(self.x)
+        q = self.c2dq(x[0])
+        v = self.c2dv(x[1])
+        cost = 10*q + 0.1*v + 0.01*self.d2cu(iu)
         self.x   = self.dynamics(self.x,iu)
         return self.x, cost
 

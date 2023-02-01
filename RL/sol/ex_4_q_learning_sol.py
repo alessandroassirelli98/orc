@@ -60,11 +60,11 @@ def q_learning(env, gamma, Q, nEpisodes, maxEpisodeLength,
         exploration_prob = np.exp(-exploration_decreasing_decay * k)
         exploration_prob = max(exploration_prob, min_exploration_prob)
 
-        if(k%nprint ==0):
+        if(k%nprint == 0):
             print("Q learning iter %d, cost to go %d , exploration %f" %(k, J, exploration_prob))
             V, pi = compute_V_pi_from_Q(env, Q)
-            # env.plot_V_table(V)
-            # env.plot_policy(pi)
+            env.plot_V_table(V)
+            env.plot_policy(pi)
     # use the function compute_V_pi_from_Q(env, Q) to compute and plot V and pi
 
     return Q, h_ctg

@@ -6,6 +6,11 @@ from keras.callbacks import TensorBoard
 import numpy as np
 import random
 from ddoublependulum import DDoublePendulum
+import matplotlib
+import matplotlib.pyplot as plt
+
+plt.style.use('seaborn')
+%matplotlib qt
 
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
@@ -265,11 +270,47 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 total_time = time.time()-start_time
 print("Total training time: ", total_time)
 
+
+a = []
+s = []
 current_state = env.reset().reshape(1,-1)
 done = False
 while not done:
+    s.append(current_state[0])
     action = np.array([np.argmin(agent.model(current_state))])
+    a.append(action)
     next_state, r, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()
     if done: break
+
+time = np.arange(0, 200,1) * 0.02
+s = np.array(s)
+
+plt.figure()
+plt.plot(time, s[:,0])
+plt.plot(time, s[:,1])
+plt.title("position")
+plt.legend(["theta_1", "theta_2"])
+plt.xlabel("time [s]")
+plt.ylabel("angle [rad]")
+plt.show()
+
+plt.figure()
+plt.plot(time, s[:,2])
+plt.plot(time, s[:,3])
+plt.title("Velocities")
+plt.legend(["d_theta_1", "d_theta_2"])
+plt.xlabel("time [s]")
+plt.ylabel("angular velocity [rad/s]")
+plt.show()
+
+
+plt.figure()
+plt.plot(env.control_map[a])
+plt.title("Torque")
+plt.legend(["torque"])
+plt.xlabel("time [s]")
+plt.ylabel("Torque [Nm]")
+plt.show()
+

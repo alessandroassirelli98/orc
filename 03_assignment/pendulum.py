@@ -57,7 +57,7 @@ class Pendulum:
 
         self.q0         = np.zeros(self.model.nq)
 
-        self.DT         = 5e-2   # Time step length
+        self.DT         = 2e-2   # Time step length
         self.NDT        = 1      # Number of Euler steps per integration (internal)
         self.Kf         = 0*.10    # Friction coefficient
         self.vmax       = 8.0    # Max velocity (clipped if larger)
