@@ -6,6 +6,11 @@ import numpy as np
 import random
 import time 
 from dpendulum import DPendulum
+from simplependulum import DSimplePendulum
+import matplotlib
+import matplotlib.pyplot as plt
+
+plt.style.use('seaborn')
 
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
@@ -67,8 +72,8 @@ QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 1000
-EXPLORATION_PROBABILITY_DECAY = 0.0001
+MIN_BUFFER_TO_TRAIN = 5000
+EXPLORATION_PROBABILITY_DECAY = 0.00001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
@@ -103,8 +108,8 @@ class DQNAgent():
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
-        # state_out1 = layers.Dense(16, activation="relu")(inputs) 
-        state_out2 = layers.Dense(64, activation="relu")(inputs) 
+        state_out1 = layers.Dense(32, activation="relu")(inputs) 
+        state_out2 = layers.Dense(64, activation="relu")(state_out1) 
         
         outputs = layers.Dense(ndu)(state_out2) 
 
@@ -208,14 +213,15 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 3
-ndu = 21
-env = DPendulum(ndu=ndu, uMax=uMax, dt=0.02)
+uMax = 4
+ndu = 101
+# env = DPendulum(ndu=ndu, uMax=uMax, dt=0.02)
+env = DSimplePendulum(ndu=ndu, uMax=uMax, dt=0.02)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
-AGGREGATE_STATS_EVERY = 5
+AGGREGATE_STATS_EVERY = 10
 MAX_NUMBER_OF_EPISODES = 3000
 STEP_BEFORE_TRAIN = 4
 
@@ -224,10 +230,11 @@ ep_accuracy = []
 
 average_cost_history = [1e6]
 
-MODEL_NAME = "Pendulum_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+MODEL_NAME = "Pendulum_d32_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
+start_time = time.time()
 for episode in range (1, MAX_NUMBER_OF_EPISODES):
     agent.tensorboard.step = episode
     print("Episode ", episode)
@@ -240,7 +247,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         iu = agent.compute_action()
         next_state, cost, done = env.step(iu)
 
-        episode_cost += cost
+        episode_cost += DISCOUNT**jj * cost
 
         agent.store_episode(current_state, iu, cost, next_state, done)
         agent.update_probability(step)
@@ -269,13 +276,50 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
         average_cost_history.append(average_cost)
 
+stop_time = time.time()
+print("Total training time: ", stop_time-start_time)
 # agent.model.load_weights("Pendulum_d64_d64_ndu3uMax3_pendulum_best.h5")
 
+a = []
+s = []
 current_state = env.reset().reshape(1,-1)
 done = False
 while not done:
+    s.append(current_state[0])
     action = np.array([np.argmin(agent.model(current_state))])
+    a.append(action)
     next_state, r, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()
     if done: break
+
+time = np.arange(0, 200,1) * 0.02
+s = np.array(s)
+
+plt.figure()
+plt.plot(time, s[:,0])
+plt.plot(time, s[:,1])
+plt.title("position")
+plt.legend(["theta_1", "theta_2"])
+plt.xlabel("time [s]")
+plt.ylabel("angle [rad]")
+plt.show()
+
+plt.figure()
+plt.plot(time, s[:,2])
+plt.plot(time, s[:,3])
+plt.title("Velocities")
+plt.legend(["d_theta_1", "d_theta_2"])
+plt.xlabel("time [s]")
+plt.ylabel("angular velocity [rad/s]")
+plt.show()
+
+
+plt.figure()
+plt.plot(env.control_map[a])
+plt.title("Torque")
+plt.legend(["torque"])
+plt.xlabel("time [s]")
+plt.ylabel("Torque [Nm]")
+plt.show()
+
