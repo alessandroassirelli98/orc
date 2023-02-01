@@ -4,14 +4,18 @@ from tensorflow.keras import layers
 from keras.callbacks import TensorBoard
 import numpy as np
 import random
-from numpy.random import randint, uniform
-import gym
 import time 
 from dpendulum import DPendulum
-from ddoublependulum import DDoublePendulum
 
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
+
+# force CPU (make CPU visible)
+cpus = tf.config.experimental.list_physical_devices('CPU')
+print(cpus)
+tf.config.set_visible_devices([], 'GPU')  # hide the GPU
+tf.config.set_visible_devices(cpus[0], 'CPU') # unhide potentially hidden CPU
+tf.config.get_visible_devices()
  
 def np2tf(y):
     ''' convert from numpy to tensorflow '''
@@ -61,7 +65,7 @@ class ModifiedTensorBoard(TensorBoard):
 
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 10_000
 MIN_BUFFER_TO_TRAIN = 1000
 EXPLORATION_PROBABILITY_DECAY = 0.0001
@@ -100,10 +104,9 @@ class DQNAgent():
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
         # state_out1 = layers.Dense(16, activation="relu")(inputs) 
-        state_out2 = layers.Dense(32, activation="relu")(inputs) 
-        state_out3 = layers.Dense(64, activation="relu")(state_out2) 
-        state_out4 = layers.Dense(64, activation="relu")(state_out3)
-        outputs = layers.Dense(ndu)(state_out4) 
+        state_out2 = layers.Dense(64, activation="relu")(inputs) 
+        
+        outputs = layers.Dense(ndu)(state_out2) 
 
         model = tf.keras.Model(inputs, outputs)
         # model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
@@ -213,16 +216,15 @@ nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 1000
+MAX_NUMBER_OF_EPISODES = 3000
 STEP_BEFORE_TRAIN = 4
 
 ep_costs = []
 ep_accuracy = []
 
-average_accuracy_history = [0]
 average_cost_history = [1e6]
 
-MODEL_NAME = "Pendulum_d32_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+MODEL_NAME = "Pendulum_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
@@ -244,8 +246,6 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         agent.update_probability(step)
         if not jj % STEP_BEFORE_TRAIN or done:
             agent.train(done)
-
-        if done: ep_accuracy.append((1-cost)*100)
         
         current_state = next_state
         step += 1
@@ -256,22 +256,17 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
-        average_accuracy = (sum(ep_accuracy[-AGGREGATE_STATS_EVERY:])/len(ep_accuracy[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(cost_avg=average_cost, 
-                                        accuracy_avg=average_accuracy,
+        agent.tensorboard.update_stats(cost_avg=average_cost,
                                         cost_min=min_cost, 
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
 
-        if average_accuracy > max(average_accuracy_history):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
+
         if average_cost < min(average_cost_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-
-        average_accuracy_history.append(average_accuracy)
         average_cost_history.append(average_cost)
 
 # agent.model.load_weights("Pendulum_d64_d64_ndu3uMax3_pendulum_best.h5")

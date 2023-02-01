@@ -1,13 +1,10 @@
 import os
+import time
 import tensorflow as tf
 from tensorflow.keras import layers
 from keras.callbacks import TensorBoard
 import numpy as np
 import random
-from numpy.random import randint, uniform
-import gym
-import time 
-from dpendulum import DPendulum
 from ddoublependulum import DDoublePendulum
 
 from tensorflow.python.ops.numpy_ops import np_config
@@ -220,11 +217,11 @@ MODEL_NAME = "DoubleP_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsd
 ep_costs = []
 ep_accuracy = []
 
-average_accuracy_history = [0]
 average_cost_history = [1e6]
 
 agent = DQNAgent()
 step = 1
+start_time = time.time()
 for episode in range (1, MAX_NUMBER_OF_EPISODES):
     agent.tensorboard.step = episode
     print("Episode ", episode )
@@ -244,9 +241,6 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         if not jj % STEP_BEFORE_TRAIN or done:
             agent.train(done)
-
-        if done:
-            ep_accuracy.append((1-cost)*100)
         
         current_state = next_state
         step += 1
@@ -257,24 +251,19 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
-        average_accuracy = (sum(ep_accuracy[-AGGREGATE_STATS_EVERY:])/len(ep_accuracy[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(cost_avg=average_cost, 
-                                        accuracy_avg=average_accuracy,
+        agent.tensorboard.update_stats(cost_avg=average_cost,
                                         cost_min=min_cost, 
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
-
-        if average_accuracy > max(average_accuracy_history):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best_accuracy.h5")
         if average_cost < min(average_cost_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-
-        average_accuracy_history.append(average_accuracy)
         average_cost_history.append(average_cost)
 
+total_time = time.time()-start_time
+print("Total training time: ", total_time)
 
 current_state = env.reset().reshape(1,-1)
 done = False
