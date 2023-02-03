@@ -1,11 +1,10 @@
 import os
+import time
 import tensorflow as tf
 from tensorflow.keras import layers
 from keras.callbacks import TensorBoard
 import numpy as np
 import random
-import time 
-from dpendulum import DPendulum
 from simplependulum import DSimplePendulum
 import matplotlib
 import matplotlib.pyplot as plt
@@ -14,13 +13,6 @@ plt.style.use('seaborn')
 
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()
-
-# force CPU (make CPU visible)
-cpus = tf.config.experimental.list_physical_devices('CPU')
-print(cpus)
-tf.config.set_visible_devices([], 'GPU')  # hide the GPU
-tf.config.set_visible_devices(cpus[0], 'CPU') # unhide potentially hidden CPU
-tf.config.get_visible_devices()
  
 def np2tf(y):
     ''' convert from numpy to tensorflow '''
@@ -72,21 +64,19 @@ QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 5000
-EXPLORATION_PROBABILITY_DECAY = 0.00001
+MIN_BUFFER_TO_TRAIN = 1000
+EXPLORATION_PROBABILITY_DECAY = 0.00005
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
 class DQNAgent():
     
-    def __init__(self, load_file = None):
+    def __init__(self):
         # Main model
         self.model = self.get_critic()
 
         # Target network
         self.target_model = self.get_critic()
-        if load_file:
-            self.model.load_weights(load_file)
         self.target_model.set_weights(self.model.get_weights())
 
         self.critic_optimizer = tf.keras.optimizers.Adam(QVALUE_LEARNING_RATE)
@@ -107,9 +97,10 @@ class DQNAgent():
     
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
-        inputs = layers.Input(shape=(2,))
-        state_out1 = layers.Dense(32, activation="relu")(inputs) 
-        state_out2 = layers.Dense(64, activation="relu")(state_out1) 
+        inputs = layers.Input(shape=(nx,))
+
+        state_out1 = layers.Dense(64, activation="relu")(inputs) 
+        state_out2 = layers.Dense(64, activation="relu")(state_out1)
         
         outputs = layers.Dense(ndu)(state_out2) 
 
@@ -213,30 +204,29 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 1
+uMax = 2
 ndu = 51
 env = DSimplePendulum(ndu=ndu, uMax=uMax, dt=0.02)
 nx = env.nx
 nu = env.nu
 
-SHOW_PREVIEW = False
-AGGREGATE_STATS_EVERY = 10
+AGGREGATE_STATS_EVERY = 5
 MAX_NUMBER_OF_EPISODES = 3000
 STEP_BEFORE_TRAIN = 4
+
+MODEL_NAME = "SimplePendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
 
 ep_costs = []
 ep_accuracy = []
 
 average_cost_history = [1e6]
 
-MODEL_NAME = "Pendulum_d32_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
-
 agent = DQNAgent()
 step = 1
 start_time = time.time()
 for episode in range (1, MAX_NUMBER_OF_EPISODES):
     agent.tensorboard.step = episode
-    print("Episode ", episode)
+    print("Episode ", episode )
 
     episode_cost = 0
     current_state = env.reset()
@@ -250,6 +240,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
         agent.store_episode(current_state, iu, cost, next_state, done)
         agent.update_probability(step)
+
         if not jj % STEP_BEFORE_TRAIN or done:
             agent.train(done)
         
@@ -269,15 +260,13 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
-
-
         if average_cost < min(average_cost_history):
             agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
         average_cost_history.append(average_cost)
 
-stop_time = time.time()
-print("Total training time: ", stop_time-start_time)
-# agent.model.load_weights("Pendulum_d64_d64_ndu3uMax3_pendulum_best.h5")
+total_time = time.time()-start_time
+print("Total training time: ", total_time)
+
 
 a = []
 s = []
@@ -297,21 +286,19 @@ s = np.array(s)
 
 plt.figure()
 plt.plot(time, s[:,0])
-plt.plot(time, s[:,1])
 plt.title("position")
-plt.legend(["theta_1", "theta_2"])
+plt.legend(["theta_1"])
 plt.xlabel("time [s]")
 plt.ylabel("angle [rad]")
-plt.show()
+plt.draw()
 
 plt.figure()
-plt.plot(time, s[:,2])
-plt.plot(time, s[:,3])
-plt.title("Velocities")
-plt.legend(["d_theta_1", "d_theta_2"])
+plt.plot(time, s[:,1])
+plt.title("Velocitiy")
+plt.legend(["d_theta_1"])
 plt.xlabel("time [s]")
 plt.ylabel("angular velocity [rad/s]")
-plt.show()
+plt.draw()
 
 
 plt.figure()
@@ -320,5 +307,7 @@ plt.title("Torque")
 plt.legend(["torque"])
 plt.xlabel("time [s]")
 plt.ylabel("Torque [Nm]")
+plt.draw()
+
 plt.show()
 

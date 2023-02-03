@@ -145,25 +145,3 @@ class DDoublePendulum:
         plt.ylabel("u")
         plt.show()
     
-if __name__=="__main__":
-    print("Start tests")
-    env = DPendulum()
-    nq = env.nq
-    nv = env.nv
-    
-    # sanity checks
-    for i in range(nq*nv):
-        x = env.i2x(i)
-        i_test = env.x2i(x)
-        if(i!=i_test):
-            print("ERROR! x2i(i2x(i))=", i_test, "!= i=", i)
-        
-        xc = env.d2c(x)
-        x_test = env.c2d(xc)
-        if(x_test[0]!=x[0] or x_test[1]!=x[1]):
-            print("ERROR! c2d(d2c(x))=", x_test, "!= x=", x)
-        xc_test = env.d2c(x_test)
-        if(np.linalg.norm(xc-xc_test)>1e-10):
-            print("ERROR! xc=", xc, "xc_test=", xc_test)
-    print("Tests finished")
-    
