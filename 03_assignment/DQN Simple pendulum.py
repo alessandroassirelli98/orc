@@ -62,10 +62,10 @@ class ModifiedTensorBoard(TensorBoard):
 
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 1000
-EXPLORATION_PROBABILITY_DECAY = 0.00005
+MIN_BUFFER_TO_TRAIN = 5000
+EXPLORATION_PROBABILITY_DECAY = 0.00001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
@@ -99,10 +99,11 @@ class DQNAgent():
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(nx,))
 
-        state_out1 = layers.Dense(64, activation="relu")(inputs) 
+        state_out1 = layers.Dense(32, activation="relu")(inputs) 
         state_out2 = layers.Dense(64, activation="relu")(state_out1)
+        state_out3 = layers.Dense(32, activation="relu")(state_out2)
         
-        outputs = layers.Dense(ndu)(state_out2) 
+        outputs = layers.Dense(ndu)(state_out3) 
 
         model = tf.keras.Model(inputs, outputs)
         # model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
@@ -204,22 +205,19 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 2
-ndu = 51
+uMax = 1
+ndu = 101
 env = DSimplePendulum(ndu=ndu, uMax=uMax, dt=0.02)
 nx = env.nx
 nu = env.nu
 
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 3000
+MAX_NUMBER_OF_EPISODES = 2000
 STEP_BEFORE_TRAIN = 4
 
-MODEL_NAME = "SimplePendulum_d64_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
+MODEL_NAME = "SimplePendulum_d32_d64_d32_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
 
 ep_costs = []
-ep_accuracy = []
-
-average_cost_history = [1e6]
 
 agent = DQNAgent()
 step = 1
@@ -250,6 +248,8 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     
 
     # Append episode cost to a list and log stats (every given number of episodes)
+    if len(ep_costs) == 0 or episode_cost < min(ep_costs):
+        agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
@@ -260,9 +260,6 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
-        if average_cost < min(average_cost_history):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-        average_cost_history.append(average_cost)
 
 total_time = time.time()-start_time
 print("Total training time: ", total_time)

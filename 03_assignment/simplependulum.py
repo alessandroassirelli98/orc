@@ -86,7 +86,7 @@ class DSimplePendulum:
         return self.x, cost, done
 
     def compute_raw_cost(self, x, u, terminal=False):
-        cost = (x[0]**2 + 0.1 * x[1]**2 + 0.01*u[0] **2) * self.dt
+        cost = (10*x[0]**2 + 0.1 * x[1]**2 + 0.001*u[0] **2) * self.dt
 
         return cost
 
