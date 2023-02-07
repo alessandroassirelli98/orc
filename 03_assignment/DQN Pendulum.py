@@ -72,8 +72,8 @@ QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 5000
-EXPLORATION_PROBABILITY_DECAY = 0.00001
+MIN_BUFFER_TO_TRAIN = 1000
+EXPLORATION_PROBABILITY_DECAY = 0.0001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
@@ -108,10 +108,13 @@ class DQNAgent():
     def get_critic(self):
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
-        state_out1 = layers.Dense(32, activation="relu")(inputs) 
-        state_out2 = layers.Dense(64, activation="relu")(state_out1) 
+
+        state_out1 = layers.Dense(64, activation="relu")(inputs) 
+        state_out2 = layers.Dense(128, activation="relu")(state_out1)
+        state_out3 = layers.Dense(64, activation="relu")(state_out2) 
         
-        outputs = layers.Dense(ndu)(state_out2) 
+        outputs = layers.Dense(ndu)(state_out3) 
+
 
         model = tf.keras.Model(inputs, outputs)
         # model.compile(loss="mse", optimizer=tf.keras.optimizers.Adam(lr=0.001), metrics=['accuracy'])
@@ -214,7 +217,7 @@ def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
 uMax = 2
-ndu = 51
+ndu = 201
 env = DPendulum(ndu=ndu, uMax=uMax, dt=0.05)
 nx = env.nx
 nu = env.nu
@@ -226,7 +229,7 @@ STEP_BEFORE_TRAIN = 4
 
 ep_costs = []
 
-MODEL_NAME = "Pendulum_d32_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+MODEL_NAME = "Pendulum_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
 agent = DQNAgent()
 step = 1
@@ -319,7 +322,7 @@ plt.show()
 
 n=51
 q_array = np.linspace(-np.pi, np.pi, n)
-v_array = np.linspace(- env.vMax1, env.vMax1, n)
+v_array = np.linspace(- env.vMax, env.vMax, n)
 
 V = np.zeros((n,n))
 for i,v in enumerate(v_array):
@@ -328,5 +331,7 @@ for i,v in enumerate(v_array):
 
 Q, DQ = np.meshgrid(q_array, v_array)
 plt.pcolormesh(Q, DQ, V, cmap=plt.cm.get_cmap('Blues'))
+
+plt.show()
 
 
