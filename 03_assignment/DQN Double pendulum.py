@@ -65,7 +65,7 @@ DISCOUNT = 0.99
 BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 100_000
 MIN_BUFFER_TO_TRAIN = 10000
-EXPLORATION_PROBABILITY_DECAY = 0.000002
+EXPLORATION_PROBABILITY_DECAY = 0.00001
 MIN_EXPLORATION_PROBABILITY = 0.1
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
@@ -213,15 +213,12 @@ nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 10000
+MAX_NUMBER_OF_EPISODES = 3000
 STEP_BEFORE_TRAIN = 4
 
 MODEL_NAME = "DoubleP_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
 
 ep_costs = []
-ep_accuracy = []
-
-average_cost_history = [1e6]
 
 agent = DQNAgent()
 step = 1
@@ -251,7 +248,10 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         jj += 1
     
 
-    # Append episode cost to a list and log stats (every given number of episodes)
+    # Append episode cost to a list and log stats (every given number of episode0
+    if len(ep_costs) == 0 or episode_cost < min(ep_costs):
+        agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
+
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
@@ -262,9 +262,6 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
-        if average_cost < min(average_cost_history):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-        average_cost_history.append(average_cost)
 
 total_time = time.time()-start_time
 print("Total training time: ", total_time)

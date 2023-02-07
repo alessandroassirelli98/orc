@@ -80,6 +80,9 @@ class DDoublePendulum:
     def compute_raw_cost(self, x, u, terminal=False):
         cost = (10*x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
                     10*x[1]**2 + 0.1 * x[3]**2) * self.dt
+        if terminal:
+            cost += (10*x[0]**2 + 0.1 * x[2]**2 + \
+                    10*x[1]**2 + 0.1 * x[3]**2)
 
         return cost
 
