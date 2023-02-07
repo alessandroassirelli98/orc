@@ -10,7 +10,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 plt.style.use('seaborn')
-%matplotlib qt
 
 from tensorflow.python.ops.numpy_ops import np_config
 np_config.enable_numpy_behavior()

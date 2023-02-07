@@ -213,21 +213,18 @@ def xy_to_t(state):
 def t_to_xy(state):
     return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
 
-uMax = 1
+uMax = 2
 ndu = 51
-env = DSimplePendulum(ndu=ndu, uMax=uMax, dt=0.02)
+env = DPendulum(ndu=ndu, uMax=uMax, dt=0.05)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 10
-MAX_NUMBER_OF_EPISODES = 3000
+MAX_NUMBER_OF_EPISODES = 500
 STEP_BEFORE_TRAIN = 4
 
 ep_costs = []
-ep_accuracy = []
-
-average_cost_history = [1e6]
 
 MODEL_NAME = "Pendulum_d32_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
 
@@ -259,6 +256,8 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     
 
     # Append episode cost to a list and log stats (every given number of episodes)
+    if len(ep_costs) == 0 or episode_cost < min(ep_costs):
+        agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
     ep_costs.append(episode_cost)
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
@@ -269,11 +268,6 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
                                         cost_max=max_cost, 
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
-
-
-        if average_cost < min(average_cost_history):
-            agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-        average_cost_history.append(average_cost)
 
 stop_time = time.time()
 print("Total training time: ", stop_time-start_time)
@@ -292,26 +286,25 @@ while not done:
     env.render()
     if done: break
 
-time = np.arange(0, 200,1) * 0.02
+time = np.arange(0, 200,1) * 0.05
 s = np.array(s)
+
 
 plt.figure()
 plt.plot(time, s[:,0])
-plt.plot(time, s[:,1])
 plt.title("position")
-plt.legend(["theta_1", "theta_2"])
+plt.legend(["theta_1"])
 plt.xlabel("time [s]")
 plt.ylabel("angle [rad]")
-plt.show()
+plt.draw()
 
 plt.figure()
-plt.plot(time, s[:,2])
-plt.plot(time, s[:,3])
-plt.title("Velocities")
-plt.legend(["d_theta_1", "d_theta_2"])
+plt.plot(time, s[:,1])
+plt.title("Velocitiy")
+plt.legend(["d_theta_1"])
 plt.xlabel("time [s]")
 plt.ylabel("angular velocity [rad/s]")
-plt.show()
+plt.draw()
 
 
 plt.figure()
@@ -320,5 +313,20 @@ plt.title("Torque")
 plt.legend(["torque"])
 plt.xlabel("time [s]")
 plt.ylabel("Torque [Nm]")
+plt.draw()
+
 plt.show()
+
+n=51
+q_array = np.linspace(-np.pi, np.pi, n)
+v_array = np.linspace(- env.vMax1, env.vMax1, n)
+
+V = np.zeros((n,n))
+for i,v in enumerate(v_array):
+    for j, q in enumerate(q_array):
+        V[i, j] = tf2np(np.min(agent.model(np.array([q,v]).reshape(1,-1))))
+
+Q, DQ = np.meshgrid(q_array, v_array)
+plt.pcolormesh(Q, DQ, V, cmap=plt.cm.get_cmap('Blues'))
+
 
