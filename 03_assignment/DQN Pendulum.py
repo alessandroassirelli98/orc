@@ -1,13 +1,11 @@
 import os
 import tensorflow as tf
 from tensorflow.keras import layers
-from keras.callbacks import TensorBoard
+from ModifiedTensorboard import ModifiedTensorBoard
 import numpy as np
 import random
 import time 
 from dpendulum import DPendulum
-from simplependulum import DSimplePendulum
-import matplotlib
 import matplotlib.pyplot as plt
 
 plt.style.use('seaborn')
@@ -30,43 +28,6 @@ def np2tf(y):
 def tf2np(y):
     ''' convert from tensorflow to numpy '''
     return tf.squeeze(y).numpy()
-
-
-#...
-
-# Own Tensorboard class
-class ModifiedTensorBoard(TensorBoard):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.step = 1
-        self.writer = tf.summary.create_file_writer(self.log_dir)
-        self._log_write_dir = self.log_dir
-
-    def set_model(self, model):
-        self.model = model
-
-        self._train_dir = os.path.join(self._log_write_dir, 'train')
-        self._train_step = self.model._train_counter
-
-        self._val_dir = os.path.join(self._log_write_dir, 'validation')
-        self._val_step = self.model._test_counter
-
-        self._should_write_train_graph = False
-
-    def on_epoch_end(self, epoch, logs=None):
-        self.update_stats(**logs)
-
-    def on_batch_end(self, batch, logs=None):
-        pass
-
-    def on_train_end(self, _):
-        pass
-
-    def update_stats(self, **stats):
-        with self.writer.as_default():
-            for key, value in stats.items():
-                tf.summary.scalar(key, value, step = self.step)
-                self.writer.flush()
 
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
@@ -193,8 +154,6 @@ class DQNAgent():
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0
 
-
-    
     def update(self, x, y):
         ''' Update the weights of the Q network using the specified batch of data '''
         # all inputs are tf tensors
@@ -209,27 +168,23 @@ class DQNAgent():
         # Update the critic backpropagating the gradients
         self.critic_optimizer.apply_gradients(zip(Q_grad, self.model.trainable_variables))
 
-
-def xy_to_t(state):
-    return np.array([np.arctan2(state[1], state[0]), state[2]])
-
-def t_to_xy(state):
-    return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
-
 uMax = 2
 ndu = 201
-env = DPendulum(ndu=ndu, uMax=uMax, dt=0.05)
+dt = 0.05
+env = DPendulum(ndu=ndu, uMax=uMax, dt=dt)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 10
 MAX_NUMBER_OF_EPISODES = 500
-STEP_BEFORE_TRAIN = 4
+STEP_BEFORE_TRAIN = 4 
 
 ep_costs = []
+avg_cost = []
 
-MODEL_NAME = "Pendulum_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_"
+MODEL_NAME = "DQNPendulum_{}_ndu_{}_umax_{}_lr_{}_epsdec_{}".\
+            format("64_128_64",ndu, uMax, QVALUE_LEARNING_RATE, EXPLORATION_PROBABILITY_DECAY)
 
 agent = DQNAgent()
 step = 1
@@ -239,7 +194,7 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     print("Episode ", episode)
 
     episode_cost = 0
-    current_state = env.reset()
+    current_state = env.reset(random=False)
     done = False
     jj = 0
     while not done:
@@ -260,21 +215,27 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
 
     # Append episode cost to a list and log stats (every given number of episodes)
     if len(ep_costs) == 0 or episode_cost < min(ep_costs):
-        agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
+        agent.model.save_weights(MODEL_NAME + "best_min.h5")
     ep_costs.append(episode_cost)
+
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
+        var_cost = np.var(ep_costs[-AGGREGATE_STATS_EVERY:])
         agent.tensorboard.update_stats(cost_avg=average_cost,
                                         cost_min=min_cost, 
                                         cost_max=max_cost, 
+                                        var_cost=var_cost,
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
+        if len(avg_cost) == 0 or average_cost < min(avg_cost):
+            agent.model.save_weights(MODEL_NAME + "best_avg.h5")
+        avg_cost.append(average_cost)
+
 
 stop_time = time.time()
 print("Total training time: ", stop_time-start_time)
-# agent.model.load_weights("Pendulum_d64_d64_ndu3uMax3_pendulum_best.h5")
 
 a = []
 s = []
@@ -282,14 +243,15 @@ current_state = env.reset().reshape(1,-1)
 done = False
 while not done:
     s.append(current_state[0])
-    action = np.array([np.argmin(agent.model(current_state))])
+    action = np.array([np.argmin(agent.model(current_state))]) # greedy action
     a.append(action)
     next_state, r, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()
     if done: break
 
-time = np.arange(0, 200,1) * 0.05
+# PLOT
+time = np.arange(0, 200,1) * dt
 s = np.array(s)
 
 
@@ -318,19 +280,36 @@ plt.xlabel("time [s]")
 plt.ylabel("Torque [Nm]")
 plt.draw()
 
-plt.show()
-
 n=51
 q_array = np.linspace(-np.pi, np.pi, n)
 v_array = np.linspace(- env.vMax, env.vMax, n)
 
 V = np.zeros((n,n))
+pi = np.zeros((n,n))
 for i,v in enumerate(v_array):
     for j, q in enumerate(q_array):
         V[i, j] = tf2np(np.min(agent.model(np.array([q,v]).reshape(1,-1))))
+        pi[i, j] = env.control_map[tf2np(np.argmin(agent.model(np.array([q,v]).reshape(1,-1))))]
+
 
 Q, DQ = np.meshgrid(q_array, v_array)
+plt.figure()
 plt.pcolormesh(Q, DQ, V, cmap=plt.cm.get_cmap('Blues'))
+plt.colorbar()
+plt.title('Value')
+plt.xlabel("q")
+plt.ylabel("dq")
+plt.draw()
+
+
+plt.figure()
+plt.pcolormesh(Q, DQ, pi, cmap=plt.cm.get_cmap('RdBu'))
+plt.colorbar()
+plt.title('Policy')
+plt.xlabel("q")
+plt.ylabel("dq")
+plt.draw()
+
 
 plt.show()
 

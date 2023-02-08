@@ -23,10 +23,7 @@ class DPendulum:
         self.uMax = uMax    # Max torque (u in [-umax,umax])
         self.vMax = vMax    # Max velocity (v in [-vmax,vmax])
 
-        self.control_map = np.linspace(-uMax, uMax, ndu)
-        self.goal = np.array([0.,0.])
-        
-        max_state = np.array([np.pi, vMax])
+        self.control_map = np.linspace(-uMax, uMax, ndu)        
 
         self.max_episodes = 200
         self.episode_counter = 0
@@ -35,10 +32,14 @@ class DPendulum:
     def map_control(self, iu):
         return self.control_map[iu]
 
-    def reset(self,x0=None):
+    def reset(self, x0=None, random=False):
         if x0 is None: 
-            q0 = np.pi
-            v0 = 0
+            if random:
+                q0 = np.random.uniform(-np.pi, np.pi)
+                v0 = np.random.uniform(0., 1.)
+            else:
+                q0 = np.pi
+                v0 = 0.
             x0 = np.array([q0,v0])
         self.x = x0
         self.episode_counter = 0
@@ -61,10 +62,7 @@ class DPendulum:
         return self.x, cost, done
     
     def compute_cost(self, x, u, terminal=False):
-        cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.01*u **2)*self.dt
-        if terminal:
-            cost += (10 * x[0]**2 + 0.1 * x[1]**2)
-        
+        cost = (10 * x[0]**2 + 0.1 * x[1]**2 + 0.01*u **2)*self.dt        
         return cost
 
     def render(self):
@@ -75,61 +73,4 @@ class DPendulum:
     def dynamics(self, x, u):
         x, _ = self.pendulum.dynamics(x, u)
         return x
-    
-    def plot_V_table(self, V):
-        ''' Plot the given Value table V '''
-        import matplotlib.pyplot as plt
-        Q,DQ = np.meshgrid([self.d2cq(i) for i in range(self.nq)], 
-                            [self.d2cv(i) for i in range(self.nv)])
-        plt.pcolormesh(Q, DQ, V.reshape((self.nv,self.nq)), cmap=plt.cm.get_cmap('Blues'))
-        plt.colorbar()
-        plt.title('V table')
-        plt.xlabel("q")
-        plt.ylabel("dq")
-        plt.show()
-        
-    def plot_policy(self, pi):
-        ''' Plot the given policy table pi '''
-        import matplotlib.pyplot as plt
-        Q,DQ = np.meshgrid([self.d2cq(i) for i in range(self.nq)], 
-                            [self.d2cv(i) for i in range(self.nv)])
-        plt.pcolormesh(Q, DQ, pi.reshape((self.nv,self.nq)), cmap=plt.cm.get_cmap('RdBu'))
-        plt.colorbar()
-        plt.title('Policy')
-        plt.xlabel("q")
-        plt.ylabel("dq")
-        plt.show()
-        
-    def plot_Q_table(self, Q):
-        ''' Plot the given Q table '''
-        import matplotlib.pyplot as plt
-        X,U = np.meshgrid(range(Q.shape[0]),range(Q.shape[1]))
-        plt.pcolormesh(X, U, Q.T, cmap=plt.cm.get_cmap('Blues'))
-        plt.colorbar()
-        plt.title('Q table')
-        plt.xlabel("x")
-        plt.ylabel("u")
-        plt.show()
-    
-if __name__=="__main__":
-    print("Start tests")
-    env = DPendulum()
-    nq = env.nq
-    nv = env.nv
-    
-    # sanity checks
-    for i in range(nq*nv):
-        x = env.i2x(i)
-        i_test = env.x2i(x)
-        if(i!=i_test):
-            print("ERROR! x2i(i2x(i))=", i_test, "!= i=", i)
-        
-        xc = env.d2c(x)
-        x_test = env.c2d(xc)
-        if(x_test[0]!=x[0] or x_test[1]!=x[1]):
-            print("ERROR! c2d(d2c(x))=", x_test, "!= x=", x)
-        xc_test = env.d2c(x_test)
-        if(np.linalg.norm(xc-xc_test)>1e-10):
-            print("ERROR! xc=", xc, "xc_test=", xc_test)
-    print("Tests finished")
-    
+  
