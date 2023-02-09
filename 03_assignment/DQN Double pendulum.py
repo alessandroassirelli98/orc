@@ -3,6 +3,7 @@ import time
 import tensorflow as tf
 from tensorflow.keras import layers
 from keras.callbacks import TensorBoard
+from ModifiedTensorboard import ModifiedTensorBoard
 import numpy as np
 import random
 from ddoublependulum import DDoublePendulum
@@ -23,50 +24,13 @@ def tf2np(y):
     ''' convert from tensorflow to numpy '''
     return tf.squeeze(y).numpy()
 
-
-#...
-
-# Own Tensorboard class
-class ModifiedTensorBoard(TensorBoard):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.step = 1
-        self.writer = tf.summary.create_file_writer(self.log_dir)
-        self._log_write_dir = self.log_dir
-
-    def set_model(self, model):
-        self.model = model
-
-        self._train_dir = os.path.join(self._log_write_dir, 'train')
-        self._train_step = self.model._train_counter
-
-        self._val_dir = os.path.join(self._log_write_dir, 'validation')
-        self._val_step = self.model._test_counter
-
-        self._should_write_train_graph = False
-
-    def on_epoch_end(self, epoch, logs=None):
-        self.update_stats(**logs)
-
-    def on_batch_end(self, batch, logs=None):
-        pass
-
-    def on_train_end(self, _):
-        pass
-
-    def update_stats(self, **stats):
-        with self.writer.as_default():
-            for key, value in stats.items():
-                tf.summary.scalar(key, value, step = self.step)
-                self.writer.flush()
-
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 128
 MEMORY_BUFFER_LENGTH = 100_000
 MIN_BUFFER_TO_TRAIN = 10000
-EXPLORATION_PROBABILITY_DECAY = 0.00001
-MIN_EXPLORATION_PROBABILITY = 0.1
+EXPLORATION_PROBABILITY_DECAY = 0.00002
+MIN_EXPLORATION_PROBABILITY = 0
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
 class DQNAgent():
@@ -198,27 +162,24 @@ class DQNAgent():
         # Update the critic backpropagating the gradients
         self.critic_optimizer.apply_gradients(zip(Q_grad, self.model.trainable_variables))
 
-
-def xy_to_t(state):
-    return np.array([np.arctan2(state[1], state[0]), state[2]])
-
-def t_to_xy(state):
-    return np.array([np.cos(state[0]), np.sin(state[0]), state[1]])
-
 uMax = 2
 ndu = 201
-env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax1=10, vMax2 = 25, dt=0.02)
+dt = 0.02
+env = DDoublePendulum(ndu=ndu, uMax=uMax, vMax1=10, vMax2 = 25, dt=dt)
 nx = env.nx
 nu = env.nu
 
 SHOW_PREVIEW = False
-AGGREGATE_STATS_EVERY = 5
-MAX_NUMBER_OF_EPISODES = 3000
+AGGREGATE_STATS_EVERY = 10
+MAX_NUMBER_OF_EPISODES = 2000
 STEP_BEFORE_TRAIN = 4
 
-MODEL_NAME = "DoubleP_d64_d128_d64_ndu" + str(ndu) + "uMax" + str(uMax) + "_epsdec" + str(EXPLORATION_PROBABILITY_DECAY) + "_lr" + str(QVALUE_LEARNING_RATE)
+
+MODEL_NAME = "DQNDoublePendulum_{}_ndu_{}_umax_{}_lr_{}_epsdec_{}".\
+            format("64_128_64",ndu, uMax, QVALUE_LEARNING_RATE, EXPLORATION_PROBABILITY_DECAY)
 
 ep_costs = []
+avg_cost = []
 
 agent = DQNAgent()
 step = 1
@@ -228,14 +189,14 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
     print("Episode ", episode )
 
     episode_cost = 0
-    current_state = env.reset()
+    current_state = env.reset(random=False)
     done = False
     jj = 0
     while not done:
         iu = agent.compute_action()
         next_state, cost, done = env.step(iu)
 
-        episode_cost += cost
+        episode_cost += DISCOUNT**jj * cost
 
         agent.store_episode(current_state, iu, cost, next_state, done)
         agent.update_probability(step)
@@ -246,22 +207,26 @@ for episode in range (1, MAX_NUMBER_OF_EPISODES):
         current_state = next_state
         step += 1
         jj += 1
-    
 
-    # Append episode cost to a list and log stats (every given number of episode0
+    # Append episode cost to a list and log stats (every given number of episodes)
     if len(ep_costs) == 0 or episode_cost < min(ep_costs):
-        agent.model.save_weights(MODEL_NAME + "pendulum_best_cost.h5")
-
+        agent.model.save_weights(MODEL_NAME + "best_min.h5")
     ep_costs.append(episode_cost)
+
     if not episode % AGGREGATE_STATS_EVERY or episode == 1:
         average_cost = (sum(ep_costs[-AGGREGATE_STATS_EVERY:])/len(ep_costs[-AGGREGATE_STATS_EVERY:]))
         min_cost = min(ep_costs[-AGGREGATE_STATS_EVERY:])
         max_cost = max(ep_costs[-AGGREGATE_STATS_EVERY:])
+        var_cost = np.var(ep_costs[-AGGREGATE_STATS_EVERY:])
         agent.tensorboard.update_stats(cost_avg=average_cost,
                                         cost_min=min_cost, 
                                         cost_max=max_cost, 
+                                        var_cost=var_cost,
                                         epsilon=agent.exploration_probability, 
                                         loss=agent.loss_value)
+        if len(avg_cost) == 0 or average_cost < min(avg_cost): # This makes sense if the state is initialized randomly
+            agent.model.save_weights(MODEL_NAME + "best_avg.h5")
+        avg_cost.append(average_cost)
 
 total_time = time.time()-start_time
 print("Total training time: ", total_time)
@@ -275,38 +240,47 @@ while not done:
     s.append(current_state[0])
     action = np.array([np.argmin(agent.model(current_state))])
     a.append(action)
-    next_state, r, done = env.step(action)
+    next_state, cost, done = env.step(action)
     current_state = next_state.reshape(1,-1)
     env.render()
     if done: break
 
-time = np.arange(0, 200,1) * 0.02
+time = np.arange(0, 200,1) * dt
 s = np.array(s)
 
 plt.figure()
 plt.plot(time, s[:,0])
 plt.plot(time, s[:,1])
-plt.title("position")
-plt.legend(["theta_1", "theta_2"])
-plt.xlabel("time [s]")
-plt.ylabel("angle [rad]")
-plt.show()
+plt.title("Position", fontsize=18)
+plt.legend(["theta_1", "theta_2"], fontsize=18)
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("angle [rad]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Double positions.png")
+plt.draw()
 
 plt.figure()
 plt.plot(time, s[:,2])
 plt.plot(time, s[:,3])
-plt.title("Velocities")
-plt.legend(["d_theta_1", "d_theta_2"])
-plt.xlabel("time [s]")
-plt.ylabel("angular velocity [rad/s]")
-plt.show()
+plt.title("Velocities", fontsize=18)
+plt.legend(["d_theta_1", "d_theta_2"], fontsize=18)
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("angular velocity [rad/s]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Double velocities.png")
+plt.draw()
 
 
 plt.figure()
 plt.plot(env.control_map[a])
-plt.title("Torque")
-plt.legend(["torque"])
-plt.xlabel("time [s]")
-plt.ylabel("Torque [Nm]")
+plt.title("Torque", fontsize=18)
+plt.legend(["torque"], fontsize=18)
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("Torque [Nm]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Double torques.png")
 plt.show()
 

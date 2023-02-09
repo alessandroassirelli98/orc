@@ -32,10 +32,10 @@ def tf2np(y):
 QVALUE_LEARNING_RATE = 1e-3
 DISCOUNT = 0.99
 BATCH_SIZE = 128
-MEMORY_BUFFER_LENGTH = 10_000
-MIN_BUFFER_TO_TRAIN = 1000
+MEMORY_BUFFER_LENGTH = 100_000
+MIN_BUFFER_TO_TRAIN = 10000
 EXPLORATION_PROBABILITY_DECAY = 0.0001
-MIN_EXPLORATION_PROBABILITY = 0.1
+MIN_EXPLORATION_PROBABILITY = 0.0
 TARGET_NETWORK_UPDATE_FREQUENCY = 10
 
 class DQNAgent():
@@ -70,11 +70,10 @@ class DQNAgent():
         ''' Create the neural network to represent the Q function '''
         inputs = layers.Input(shape=(2,))
 
-        state_out1 = layers.Dense(64, activation="relu")(inputs) 
-        state_out2 = layers.Dense(128, activation="relu")(state_out1)
-        state_out3 = layers.Dense(64, activation="relu")(state_out2) 
+        state_out1 = layers.Dense(32, activation="relu")(inputs) 
+        state_out2 = layers.Dense(32, activation="relu")(state_out1)
         
-        outputs = layers.Dense(ndu)(state_out3) 
+        outputs = layers.Dense(ndu)(state_out2) 
 
 
         model = tf.keras.Model(inputs, outputs)
@@ -169,7 +168,7 @@ class DQNAgent():
         self.critic_optimizer.apply_gradients(zip(Q_grad, self.model.trainable_variables))
 
 uMax = 2
-ndu = 201
+ndu = 51
 dt = 0.05
 env = DPendulum(ndu=ndu, uMax=uMax, dt=dt)
 nx = env.nx
@@ -177,14 +176,14 @@ nu = env.nu
 
 SHOW_PREVIEW = False
 AGGREGATE_STATS_EVERY = 10
-MAX_NUMBER_OF_EPISODES = 500
+MAX_NUMBER_OF_EPISODES = 1000
 STEP_BEFORE_TRAIN = 4 
 
 ep_costs = []
 avg_cost = []
 
 MODEL_NAME = "DQNPendulum_{}_ndu_{}_umax_{}_lr_{}_epsdec_{}".\
-            format("64_128_64",ndu, uMax, QVALUE_LEARNING_RATE, EXPLORATION_PROBABILITY_DECAY)
+            format("32_32",ndu, uMax, QVALUE_LEARNING_RATE, EXPLORATION_PROBABILITY_DECAY)
 
 agent = DQNAgent()
 step = 1
@@ -254,33 +253,43 @@ while not done:
 time = np.arange(0, 200,1) * dt
 s = np.array(s)
 
-
 plt.figure()
 plt.plot(time, s[:,0])
-plt.title("position")
-plt.legend(["theta_1"])
-plt.xlabel("time [s]")
-plt.ylabel("angle [rad]")
+plt.title("Position", fontsize=18)
+plt.legend(["theta"], fontsize=18)
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("angle [rad]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Single positions.png")
 plt.draw()
 
 plt.figure()
 plt.plot(time, s[:,1])
-plt.title("Velocitiy")
-plt.legend(["d_theta_1"])
-plt.xlabel("time [s]")
-plt.ylabel("angular velocity [rad/s]")
+plt.title("Velocitiy", fontsize=18)
+plt.legend(["d_theta"], fontsize=18)
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("angular velocity [rad/s]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Single velocities.png")
 plt.draw()
 
 
-plt.figure()
+plt.figure(), fontsize=18
 plt.plot(env.control_map[a])
-plt.title("Torque")
-plt.legend(["torque"])
-plt.xlabel("time [s]")
-plt.ylabel("Torque [Nm]")
-plt.draw()
+plt.title("Torque", fontsize=18)
+plt.legend(["torque"], fontsize=18, loc="upper right")
+plt.xlabel("time [s]", fontsize=18)
+plt.ylabel("Torque [Nm]", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Single torques.png")
+plt.show()
 
-n=51
+
+
+n=151
 q_array = np.linspace(-np.pi, np.pi, n)
 v_array = np.linspace(- env.vMax, env.vMax, n)
 
@@ -296,18 +305,24 @@ Q, DQ = np.meshgrid(q_array, v_array)
 plt.figure()
 plt.pcolormesh(Q, DQ, V, cmap=plt.cm.get_cmap('Blues'))
 plt.colorbar()
-plt.title('Value')
-plt.xlabel("q")
-plt.ylabel("dq")
+plt.title('Value', fontsize=18)
+plt.xlabel("q", fontsize=18)
+plt.ylabel("dq", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Single Value F.png")
 plt.draw()
 
 
 plt.figure()
 plt.pcolormesh(Q, DQ, pi, cmap=plt.cm.get_cmap('RdBu'))
 plt.colorbar()
-plt.title('Policy')
-plt.xlabel("q")
-plt.ylabel("dq")
+plt.title('Policy', fontsize=18)
+plt.xlabel("q", fontsize=18)
+plt.ylabel("dq", fontsize=18)
+plt.xticks(weight='bold')
+plt.yticks(weight='bold')
+plt.savefig("Single Policy.png")
 plt.draw()
 
 

@@ -27,10 +27,6 @@ class DDoublePendulum:
         self.vMax2 = vMax2    # Max velocity (v in [-vmax,vmax])
 
         self.control_map = np.linspace(-uMax, uMax, ndu)
-        self.goal = np.array([0.,0.])
-        
-        max_state = np.array([np.pi, np.pi, vMax1, vMax2])
-        self.max_cost = self.compute_raw_cost(max_state, [uMax])
 
         self.max_episodes = 200
         self.episode_counter = 0
@@ -50,12 +46,14 @@ class DDoublePendulum:
     def map_control(self, iu):
         return self.control_map[iu]
 
-    def reset(self,x0=None):
+    def reset(self, x0=None, random=False):
         if x0 is None: 
-            q0 = np.array([np.pi, 0])
-            v0 = np.array([0, 0])
-            # q0 = np.array([np.random.uniform(-np.pi, np.pi), 0*np.random.uniform(-np.pi, np.pi)])
-            # v0 = np.array([np.random.uniform(-1., 1.), 0*np.random.uniform(-1., 1.)])
+            if random:
+                q0 = np.array([np.random.uniform(-np.pi, np.pi), 0.])
+                v0 = np.array([np.random.uniform(-1., 1.), 0.])
+            else:
+                q0 = np.array([np.pi, 0.])
+                v0 = np.array([0., 0.])
             x0 = np.concatenate([q0,v0])
         self.x = x0
         self.episode_counter = 0
@@ -73,17 +71,13 @@ class DDoublePendulum:
         if self.episode_counter == self.max_episodes:
             done = True
 
-        cost = self.compute_raw_cost(x, u) #/ self.max_cost
+        cost = self.compute_raw_cost(x, u) 
         
         return self.x, cost, done
 
-    def compute_raw_cost(self, x, u, terminal=False):
+    def compute_raw_cost(self, x, u):
         cost = (10*x[0]**2 + 0.1 * x[2]**2 + 0.01*u[0] **2 + \
                     10*x[1]**2 + 0.1 * x[3]**2) * self.dt
-        if terminal:
-            cost += (10*x[0]**2 + 0.1 * x[2]**2 + \
-                    10*x[1]**2 + 0.1 * x[3]**2)
-
         return cost
 
     def render(self):
@@ -112,39 +106,3 @@ class DDoublePendulum:
 
         x = np.concatenate([q, v])
         return x
-    
-    def plot_V_table(self, V):
-        ''' Plot the given Value table V '''
-        import matplotlib.pyplot as plt
-        Q,DQ = np.meshgrid([self.d2cq(i) for i in range(self.nq)], 
-                            [self.d2cv(i) for i in range(self.nv)])
-        plt.pcolormesh(Q, DQ, V.reshape((self.nv,self.nq)), cmap=plt.cm.get_cmap('Blues'))
-        plt.colorbar()
-        plt.title('V table')
-        plt.xlabel("q")
-        plt.ylabel("dq")
-        plt.show()
-        
-    def plot_policy(self, pi):
-        ''' Plot the given policy table pi '''
-        import matplotlib.pyplot as plt
-        Q,DQ = np.meshgrid([self.d2cq(i) for i in range(self.nq)], 
-                            [self.d2cv(i) for i in range(self.nv)])
-        plt.pcolormesh(Q, DQ, pi.reshape((self.nv,self.nq)), cmap=plt.cm.get_cmap('RdBu'))
-        plt.colorbar()
-        plt.title('Policy')
-        plt.xlabel("q")
-        plt.ylabel("dq")
-        plt.show()
-        
-    def plot_Q_table(self, Q):
-        ''' Plot the given Q table '''
-        import matplotlib.pyplot as plt
-        X,U = np.meshgrid(range(Q.shape[0]),range(Q.shape[1]))
-        plt.pcolormesh(X, U, Q.T, cmap=plt.cm.get_cmap('Blues'))
-        plt.colorbar()
-        plt.title('Q table')
-        plt.xlabel("x")
-        plt.ylabel("u")
-        plt.show()
-    

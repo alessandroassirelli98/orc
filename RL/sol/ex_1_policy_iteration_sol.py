@@ -55,6 +55,6 @@ def policy_iteration(env, gamma, pi, V, maxEvalIters, maxImprIters, value_thr, p
             break
         if(k%nprint==0):
             print("Policy iteration - Iter %d, err %f"%(k, err))
-            # env.plot_V_table(V)
-            # env.plot_policy(pi)
+            env.plot_V_table(V)
+            env.plot_policy(pi)
     return pi

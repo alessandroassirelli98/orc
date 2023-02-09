@@ -64,8 +64,8 @@ if __name__=='__main__':
     min_exploration_prob            = 0.001 # minimum of exploration proba
     
     ### --- Environment
-    nq=101   # number of discretization steps for the joint angle q
-    nv=101   # number of discretization steps for the joint velocity v
+    nq=51   # number of discretization steps for the joint angle q
+    nv=51   # number of discretization steps for the joint velocity v
     nu=21   # number of discretization steps for the joint torque u
     env = DPendulum(nq, nv, nu)
     Q   = np.zeros([env.nx,env.nu])       # Q-table initialized to 0
