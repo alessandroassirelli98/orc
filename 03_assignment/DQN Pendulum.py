@@ -276,7 +276,7 @@ plt.savefig("Single velocities.png")
 plt.draw()
 
 
-plt.figure(), fontsize=18
+plt.figure()
 plt.plot(env.control_map[a])
 plt.title("Torque", fontsize=18)
 plt.legend(["torque"], fontsize=18, loc="upper right")
